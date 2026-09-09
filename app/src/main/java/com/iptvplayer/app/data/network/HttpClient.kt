@@ -8,20 +8,20 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Récupère du contenu texte distant (M3U ou XMLTV) en HTTPS quand disponible.
- * Toute erreur réseau est convertie en exception claire pour être affichée à l'utilisateur.
- */
 @Singleton
 class HttpClient @Inject constructor() {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(75, TimeUnit.SECONDS)
         .build()
 
     suspend fun fetchText(url: String): String = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; IPTV Player) AppleWebKit/537.36")
+            .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw java.io.IOException("Le serveur a répondu avec le code ${response.code}")
