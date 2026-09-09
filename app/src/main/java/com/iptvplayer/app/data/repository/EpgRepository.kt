@@ -4,8 +4,10 @@ import com.iptvplayer.app.data.local.SecurePrefs
 import com.iptvplayer.app.data.model.EpgProgram
 import com.iptvplayer.app.data.network.HttpClient
 import com.iptvplayer.app.data.parser.XmlTvParser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,19 +16,16 @@ class EpgRepository @Inject constructor(
     private val httpClient: HttpClient,
     private val securePrefs: SecurePrefs
 ) {
-    // Programmes groupés par identifiant de chaîne EPG, pour un accès rapide
     private val _programsByChannel = MutableStateFlow<Map<String, List<EpgProgram>>>(emptyMap())
     val programsByChannel: StateFlow<Map<String, List<EpgProgram>>> = _programsByChannel
 
-    /**
-     * Télécharge et parse le fichier EPG XMLTV configuré par l'utilisateur.
-     * Ne fait rien si aucune URL EPG n'est renseignée (fonctionnalité optionnelle).
-     */
     suspend fun syncEpg() {
         val url = securePrefs.epgUrl?.takeIf { it.isNotBlank() } ?: return
         try {
             val rawXml = httpClient.fetchText(url)
-            val programs = XmlTvParser.parse(rawXml)
+            val programs = withContext(Dispatchers.Default) {
+                XmlTvParser.parse(rawXml)
+            }
             _programsByChannel.value = programs.groupBy { it.channelEpgId }
         } catch (e: Exception) {
             // L'EPG est optionnel : une erreur ici ne doit jamais bloquer le Live TV
