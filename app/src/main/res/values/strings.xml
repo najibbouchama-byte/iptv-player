@@ -1,0 +1,46 @@
+<resources>
+    <string name="app_name">IPTV Player</string>
+
+    <string name="login_title">Connexion</string>
+    <string name="login_url_label">URL de la playlist M3U</string>
+    <string name="login_name_label">Nom du profil (optionnel)</string>
+    <string name="login_remember">Se souvenir de moi sur cet appareil</string>
+    <string name="login_button">Connexion</string>
+    <string name="login_error_empty_url">Merci de saisir une URL M3U</string>
+    <string name="login_error_invalid_url">L\'URL saisie n\'est pas valide</string>
+    <string name="login_error_network">Impossible de charger la playlist. Vérifiez votre connexion ou l\'URL</string>
+    <string name="login_loading">Chargement de la playlist…</string>
+
+    <string name="home_title">Accueil</string>
+    <string name="home_recent">Dernières chaînes regardées</string>
+    <string name="home_no_recent">Aucune chaîne regardée pour le moment</string>
+
+    <string name="live_tv_title">Live TV</string>
+    <string name="live_tv_search_hint">Rechercher une chaîne…</string>
+    <string name="live_tv_no_channels">Aucune chaîne trouvée</string>
+    <string name="live_tv_categories">Catégories</string>
+    <string name="live_tv_all">Toutes</string>
+
+    <string name="favorites_title">Favoris</string>
+    <string name="favorites_empty">Vous n\'avez pas encore de favoris.\nAppuyez longuement sur une chaîne pour l\'ajouter.</string>
+
+    <string name="search_title">Recherche</string>
+
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_account">Compte</string>
+    <string name="settings_change_playlist">Changer de playlist M3U</string>
+    <string name="settings_epg_url">URL du guide EPG (XMLTV, optionnel)</string>
+    <string name="settings_sync_epg_now">Synchroniser l\'EPG maintenant</string>
+    <string name="settings_logout">Déconnexion</string>
+    <string name="settings_about">À propos</string>
+
+    <string name="player_now">En cours</string>
+    <string name="player_next">Ensuite</string>
+    <string name="player_error">Impossible de lire ce flux</string>
+
+    <string name="nav_home">Accueil</string>
+    <string name="nav_live_tv">Live TV</string>
+    <string name="nav_favorites">Favoris</string>
+    <string name="nav_search">Recherche</string>
+    <string name="nav_settings">Paramètres</string>
+</resources>
