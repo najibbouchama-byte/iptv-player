@@ -3,33 +3,21 @@ package com.iptvplayer.app.data.parser
 import com.iptvplayer.app.data.model.EpgProgram
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
-import java.io.StringReader
+import java.io.Reader
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-/**
- * Parseur XMLTV (format standard des guides EPG IPTV) :
- *
- * <programme start="20260909200000 +0200" stop="20260909220000 +0200" channel="france2">
- *   <title>Le journal</title>
- *   <desc>Résumé...</desc>
- * </programme>
- *
- * Si l'EPG n'est pas fourni ou mal formé, on retourne une liste vide sans planter l'appli :
- * l'EPG est une fonctionnalité optionnelle ("lorsque les données sont disponibles").
- */
 object XmlTvParser {
 
-    // Format XMLTV : yyyyMMddHHmmss Z (le "Z" ici représente le fuseau, ex: +0200)
     private val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
 
-    fun parse(rawXml: String): List<EpgProgram> {
+    fun parse(reader: Reader): List<EpgProgram> {
         val programs = mutableListOf<EpgProgram>()
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = false
             val parser = factory.newPullParser()
-            parser.setInput(StringReader(rawXml))
+            parser.setInput(reader)
 
             var eventType = parser.eventType
             var currentChannel: String? = null
@@ -79,7 +67,6 @@ object XmlTvParser {
                 eventType = parser.next()
             }
         } catch (e: Exception) {
-            // On avale l'erreur : un EPG mal formé ne doit jamais faire planter l'application
             return programs
         }
         return programs
