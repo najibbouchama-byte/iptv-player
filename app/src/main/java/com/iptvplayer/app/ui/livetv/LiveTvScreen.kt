@@ -19,17 +19,21 @@ fun LiveTvScreen(
     viewModel: LiveTvViewModel = hiltViewModel(),
     onChannelClick: (Channel) -> Unit
 ) {
-    val playlist by viewModel.playlist.collectAsState()
+    val categories by viewModel.categories.collectAsState()
     val favorites by viewModel.favorites.collectAsState(initial = emptyList())
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isLoadingChannels by viewModel.isLoadingChannels.collectAsState()
+    val channels by viewModel.channels.collectAsState()
     val programsByChannel by viewModel.epgRepository.programsByChannel.collectAsState()
 
-    val allChannels = playlist?.channels.orEmpty()
-    val categories = playlist?.categories.orEmpty()
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
-    val filteredChannels = remember(allChannels, selectedCategory, searchQuery) {
-        viewModel.filteredChannels(allChannels)
+    val filteredChannels = remember(channels, searchQuery) { viewModel.filteredChannels() }
+
+    LaunchedEffect(categories) {
+        if (selectedCategory == null && categories.isNotEmpty()) {
+            viewModel.selectCategory(categories.first())
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -47,48 +51,58 @@ fun LiveTvScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                FilterChip(
-                    selected = selectedCategory == null,
-                    onClick = { viewModel.selectCategory(null) },
-                    label = { Text(stringResource(R.string.live_tv_all)) }
-                )
+        if (categories.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-            items(categories) { category ->
+            return@Column
+        }
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(categories, key = { it.id }) { category ->
                 FilterChip(
-                    selected = selectedCategory == category,
+                    selected = selectedCategory?.id == category.id,
                     onClick = { viewModel.selectCategory(category) },
-                    label = { Text(category) }
+                    label = { Text(category.name) }
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (filteredChannels.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(R.string.live_tv_no_channels),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
+        when {
+            isLoadingChannels -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filteredChannels, key = { it.id }) { channel ->
-                    ChannelRow(
-                        channel = channel,
-                        isFavorite = favoriteIds.contains(channel.id),
-                        currentProgram = programsByChannel[channel.epgChannelId]
-                            ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
-                        onClick = {
-                            viewModel.recordWatched(channel)
-                            onChannelClick(channel)
-                        },
-                        onToggleFavorite = { viewModel.toggleFavorite(channel) }
+            filteredChannels.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.live_tv_no_channels),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                 }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
+            else -> {
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filteredChannels, key = { it.id }) { channel ->
+                        ChannelRow(
+                            channel = channel,
+                            isFavorite = favoriteIds.contains(channel.id),
+                            currentProgram = programsByChannel[channel.epgChannelId]
+                                ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
+                            onClick = {
+                                viewModel.recordWatched(channel)
+                                onChannelClick(channel)
+                            },
+                            onToggleFavorite = { viewModel.toggleFavorite(channel) },
+                            showLogo = !listState.isScrollInProgress
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
             }
         }
     }
