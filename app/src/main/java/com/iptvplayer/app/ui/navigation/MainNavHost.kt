@@ -39,19 +39,26 @@ private val tabs = listOf(
 
 @Composable
 fun MainNavHost(onLoggedOut: () -> Unit) {
-    var selectedChannel by remember { mutableStateOf<Channel?>(null) }
+    var playerQueue by remember { mutableStateOf<List<Channel>>(emptyList()) }
+    var playerIndex by remember { mutableStateOf(0) }
 
-    if (selectedChannel != null) {
-        val channel = selectedChannel!!
+    if (playerQueue.isNotEmpty()) {
+        val channel = playerQueue[playerIndex]
+        val hasNext = playerIndex < playerQueue.size - 1
+        val hasPrevious = playerIndex > 0
         if (channel.category == "Films" || channel.category == "Séries") {
             VlcPlayerScreen(
                 channel = channel,
-                onBack = { selectedChannel = null }
+                hasNext = hasNext,
+                hasPrevious = hasPrevious,
+                onNext = { if (hasNext) playerIndex++ },
+                onPrevious = { if (hasPrevious) playerIndex-- },
+                onBack = { playerQueue = emptyList(); playerIndex = 0 }
             )
         } else {
             PlayerScreen(
                 channel = channel,
-                onBack = { selectedChannel = null }
+                onBack = { playerQueue = emptyList(); playerIndex = 0 }
             )
         }
         return
@@ -90,19 +97,22 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             modifier = androidx.compose.ui.Modifier.padding(innerPadding)
         ) {
             composable("home") {
-                HomeScreen(onChannelClick = { selectedChannel = it })
+                HomeScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
             }
             composable("live_tv") {
-                LiveTvScreen(onChannelClick = { selectedChannel = it })
+                LiveTvScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
             }
             composable("movies") {
-                MoviesScreen(onChannelClick = { selectedChannel = it })
+                MoviesScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
             }
             composable("series") {
-                SeriesScreen(onChannelClick = { selectedChannel = it })
+                SeriesScreen(onPlayEpisodes = { channels, startIndex ->
+                    playerQueue = channels
+                    playerIndex = startIndex
+                })
             }
             composable("favorites") {
-                FavoritesScreen(onChannelClick = { selectedChannel = it })
+                FavoritesScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
             }
             composable("settings") {
                 SettingsScreen(onLoggedOut = onLoggedOut)
