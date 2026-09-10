@@ -4,8 +4,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,30 +16,28 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.ui.favorites.FavoritesScreen
 import com.iptvplayer.app.ui.home.HomeScreen
 import com.iptvplayer.app.ui.livetv.LiveTvScreen
+import com.iptvplayer.app.ui.movies.MoviesScreen
 import com.iptvplayer.app.ui.player.PlayerScreen
-import com.iptvplayer.app.ui.search.SearchScreen
+import com.iptvplayer.app.ui.series.SeriesScreen
 import com.iptvplayer.app.ui.settings.SettingsScreen
 
-private data class Tab(val route: String, val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val tabs = listOf(
-    Tab("home", R.string.nav_home, Icons.Filled.Home),
-    Tab("live_tv", R.string.nav_live_tv, Icons.Filled.Tv),
-    Tab("favorites", R.string.nav_favorites, Icons.Filled.Favorite),
-    Tab("search", R.string.nav_search, Icons.Filled.Search),
-    Tab("settings", R.string.nav_settings, Icons.Filled.Settings)
+    Tab("home", "Accueil", Icons.Filled.Home),
+    Tab("live_tv", "Live TV", Icons.Filled.Tv),
+    Tab("movies", "Films", Icons.Filled.Movie),
+    Tab("series", "Séries", Icons.Filled.Theaters),
+    Tab("favorites", "Favoris", Icons.Filled.Favorite),
+    Tab("settings", "Paramètres", Icons.Filled.Settings)
 )
 
 @Composable
 fun MainNavHost(onLoggedOut: () -> Unit) {
-    // Chaîne actuellement sélectionnée : si non nulle, on affiche le lecteur plein écran
-    // par-dessus la navigation par onglets (plus simple et plus fiable que de faire transiter
-    // un objet Channel complet à travers le système de navigation).
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
 
     if (selectedChannel != null) {
@@ -70,7 +69,7 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(stringResource(tab.labelRes)) }
+                        label = { Text(tab.label) }
                     )
                 }
             }
@@ -87,11 +86,14 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             composable("live_tv") {
                 LiveTvScreen(onChannelClick = { selectedChannel = it })
             }
+            composable("movies") {
+                MoviesScreen(onChannelClick = { selectedChannel = it })
+            }
+            composable("series") {
+                SeriesScreen(onChannelClick = { selectedChannel = it })
+            }
             composable("favorites") {
                 FavoritesScreen(onChannelClick = { selectedChannel = it })
-            }
-            composable("search") {
-                SearchScreen(onChannelClick = { selectedChannel = it })
             }
             composable("settings") {
                 SettingsScreen(onLoggedOut = onLoggedOut)
@@ -99,6 +101,3 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
         }
     }
 }
-
-@Composable
-private fun stringResource(id: Int): String = androidx.compose.ui.res.stringResource(id)
