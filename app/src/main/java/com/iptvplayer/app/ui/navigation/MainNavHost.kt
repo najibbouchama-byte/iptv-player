@@ -22,6 +22,7 @@ import com.iptvplayer.app.ui.home.HomeScreen
 import com.iptvplayer.app.ui.livetv.LiveTvScreen
 import com.iptvplayer.app.ui.movies.MoviesScreen
 import com.iptvplayer.app.ui.player.PlayerScreen
+import com.iptvplayer.app.ui.player.VlcPlayerScreen
 import com.iptvplayer.app.ui.series.SeriesScreen
 import com.iptvplayer.app.ui.settings.SettingsScreen
 
@@ -41,10 +42,18 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
 
     if (selectedChannel != null) {
-        PlayerScreen(
-            channel = selectedChannel!!,
-            onBack = { selectedChannel = null }
-        )
+        val channel = selectedChannel!!
+        if (channel.category == "Films" || channel.category == "Séries") {
+            VlcPlayerScreen(
+                channel = channel,
+                onBack = { selectedChannel = null }
+            )
+        } else {
+            PlayerScreen(
+                channel = channel,
+                onBack = { selectedChannel = null }
+            )
+        }
         return
     }
 
