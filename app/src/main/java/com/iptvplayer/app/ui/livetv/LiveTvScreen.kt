@@ -27,8 +27,10 @@ fun LiveTvScreen(
 
     val allChannels = playlist?.channels.orEmpty()
     val categories = playlist?.categories.orEmpty()
-    val favoriteIds = favorites.map { it.id }.toSet()
-    val filteredChannels = viewModel.filteredChannels(allChannels)
+    val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
+    val filteredChannels = remember(allChannels, selectedCategory, searchQuery) {
+        viewModel.filteredChannels(allChannels)
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Spacer(modifier = Modifier.height(16.dp))
