@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,21 +22,23 @@ fun SeriesScreen(
     viewModel: SeriesViewModel = hiltViewModel(),
     onPlayEpisodes: (List<Channel>, Int) -> Unit
 ) {
-    var selectedSeries by remember { mutableStateOf<Series?>(null) }
-
-    if (selectedSeries != null) {
-        SeriesDetailScreen(
-            series = selectedSeries!!,
-            onBack = { selectedSeries = null },
-            onPlayEpisodes = onPlayEpisodes
-        )
-        return
-    }
+    var selectedSeriesId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val seriesList by viewModel.series.collectAsState()
+
+    val selectedSeries = seriesList.find { it.id == selectedSeriesId }
+
+    if (selectedSeries != null) {
+        SeriesDetailScreen(
+            series = selectedSeries,
+            onBack = { selectedSeriesId = null },
+            onPlayEpisodes = onPlayEpisodes
+        )
+        return
+    }
 
     LaunchedEffect(categories) {
         if (selectedCategory == null && categories.isNotEmpty()) {
@@ -88,7 +91,7 @@ fun SeriesScreen(
                         title = series.name,
                         posterUrl = series.posterUrl,
                         showPoster = !gridState.isScrollInProgress,
-                        onClick = { selectedSeries = series }
+                        onClick = { selectedSeriesId = series.id }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
