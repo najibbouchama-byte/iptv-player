@@ -42,6 +42,8 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
     var playerQueue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playerIndex by remember { mutableStateOf(0) }
 
+    val navController = rememberNavController()
+
     if (playerQueue.isNotEmpty()) {
         val channel = playerQueue[playerIndex]
         val hasNext = playerIndex < playerQueue.size - 1
@@ -63,8 +65,6 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
         }
         return
     }
-
-    val navController = rememberNavController()
 
     Scaffold(
         bottomBar = {
