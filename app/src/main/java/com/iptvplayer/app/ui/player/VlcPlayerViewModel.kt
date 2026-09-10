@@ -32,6 +32,17 @@ class VlcPlayerViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
+    private val _currentPosition = MutableStateFlow(0L)
+    val currentPosition: StateFlow<Long> = _currentPosition
+
+    private val _duration = MutableStateFlow(0L)
+    val duration: StateFlow<Long> = _duration
+
+    private val aspectModes = listOf(null, "16:9", "4:3", "1:1")
+    private var aspectIndex = 0
+    private val _aspectLabel = MutableStateFlow("Ajusté")
+    val aspectLabel: StateFlow<String> = _aspectLabel
+
     init {
         mediaPlayer.setEventListener { event ->
             when (event.type) {
@@ -44,6 +55,10 @@ class VlcPlayerViewModel @Inject constructor(
                 MediaPlayer.Event.Buffering -> {
                     _isBuffering.value = event.buffering < 100f
                 }
+                MediaPlayer.Event.TimeChanged -> {
+                    _currentPosition.value = event.timeChanged
+                    _duration.value = mediaPlayer.length
+                }
                 MediaPlayer.Event.EncounteredError -> {
                     _isBuffering.value = false
                     _errorMessage.value = "Le lecteur de secours n'a pas réussi à lire ce contenu non plus."
@@ -53,6 +68,24 @@ class VlcPlayerViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun seekRelative(deltaMs: Long) {
+        val length = mediaPlayer.length
+        if (length <= 0) return
+        val newPosition = (mediaPlayer.time + deltaMs).coerceIn(0, length)
+        mediaPlayer.time = newPosition
+    }
+
+    fun seekTo(positionMs: Long) {
+        mediaPlayer.time = positionMs
+    }
+
+    fun cycleAspectRatio() {
+        aspectIndex = (aspectIndex + 1) % aspectModes.size
+        val mode = aspectModes[aspectIndex]
+        mediaPlayer.setAspectRatio(mode)
+        _aspectLabel.value = mode ?: "Ajusté"
     }
 
     fun play(channel: Channel) {
