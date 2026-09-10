@@ -31,7 +31,8 @@ fun ChannelRow(
     isFavorite: Boolean,
     currentProgram: EpgProgram?,
     onClick: () -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    showLogo: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -49,7 +50,7 @@ fun ChannelRow(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            if (channel.logoUrl != null) {
+            if (channel.logoUrl != null && showLogo) {
                 AsyncImage(
                     model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
                         .data(channel.logoUrl)
