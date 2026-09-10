@@ -19,7 +19,7 @@ import com.iptvplayer.app.ui.common.PosterCard
 @Composable
 fun SeriesScreen(
     viewModel: SeriesViewModel = hiltViewModel(),
-    onChannelClick: (Channel) -> Unit
+    onPlayEpisodes: (List<Channel>, Int) -> Unit
 ) {
     var selectedSeries by remember { mutableStateOf<Series?>(null) }
 
@@ -27,7 +27,7 @@ fun SeriesScreen(
         SeriesDetailScreen(
             series = selectedSeries!!,
             onBack = { selectedSeries = null },
-            onEpisodeClick = onChannelClick
+            onPlayEpisodes = onPlayEpisodes
         )
         return
     }
