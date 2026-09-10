@@ -28,6 +28,13 @@ class SeriesViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _selectedSeriesId = MutableStateFlow<String?>(null)
+    val selectedSeriesId: StateFlow<String?> = _selectedSeriesId.asStateFlow()
+
+    fun selectSeries(id: String?) {
+        _selectedSeriesId.value = id
+    }
+
     init {
         viewModelScope.launch { xtreamRepository.loadSeriesCategoriesIfNeeded() }
     }
