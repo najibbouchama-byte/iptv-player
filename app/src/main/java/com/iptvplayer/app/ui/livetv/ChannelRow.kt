@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Scale
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.EpgProgram
 
@@ -49,7 +51,12 @@ fun ChannelRow(
         ) {
             if (channel.logoUrl != null) {
                 AsyncImage(
-                    model = channel.logoUrl,
+                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(channel.logoUrl)
+                        .size(96)
+                        .scale(Scale.FIT)
+                        .crossfade(false)
+                        .build(),
                     contentDescription = channel.name,
                     modifier = Modifier.fillMaxSize()
                 )
