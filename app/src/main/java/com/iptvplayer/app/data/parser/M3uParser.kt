@@ -1,57 +1,75 @@
 package com.iptvplayer.app.data.parser
 
-import com.iptvplayer.app.data.model.Channel
-import com.iptvplayer.app.data.model.Playlist
-import java.io.BufferedReader
-import java.util.UUID
+import com.iptvplayer.app.data.model.EpgProgram
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.Reader
+import java.text.SimpleDateFormat
+import java.util.Locale
 
-object M3uParser {
+object XmlTvParser {
 
-    private val attributeRegex = Regex("""([a-zA-Z0-9_-]+)="([^"]*)"""")
+    private val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
 
-    fun parse(reader: BufferedReader): Playlist {
-        val channels = mutableListOf<Channel>()
-        var pendingName: String? = null
-        var pendingLogo: String? = null
-        var pendingCategory: String = "Autres"
-        var pendingTvgId: String? = null
+    fun parse(reader: Reader): List<EpgProgram> {
+        val programs = mutableListOf<EpgProgram>()
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = false
+            val parser = factory.newPullParser()
+            parser.setInput(reader)
 
-        reader.lineSequence().forEach { rawLine ->
-            val line = rawLine.trim()
-            if (line.isEmpty()) return@forEach
+            var eventType = parser.eventType
+            var currentChannel: String? = null
+            var currentStart: Long? = null
+            var currentStop: Long? = null
+            var currentTitle: String? = null
+            var currentDesc: String? = null
+            var textBuffer = StringBuilder()
 
-            when {
-                line.startsWith("#EXTM3U") -> {
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        textBuffer = StringBuilder()
+                        if (parser.name == "programme") {
+                            currentChannel = parser.getAttributeValue(null, "channel")
+                            currentStart = safeParseDate(parser.getAttributeValue(null, "start"))
+                            currentStop = safeParseDate(parser.getAttributeValue(null, "stop"))
+                            currentTitle = null
+                            currentDesc = null
+                        }
+                    }
+                    XmlPullParser.TEXT -> {
+                        textBuffer.append(parser.text)
+                    }
+                    XmlPullParser.END_TAG -> {
+                        when (parser.name) {
+                            "title" -> currentTitle = textBuffer.toString().trim()
+                            "desc" -> currentDesc = textBuffer.toString().trim()
+                            "programme" -> {
+                                val channel = currentChannel
+                                val start = currentStart
+                                val stop = currentStop
+                                val title = currentTitle
+                                if (channel != null && start != null && stop != null && title != null) {
+                                    programs += EpgProgram(
+                                        channelEpgId = channel,
+                                        title = title,
+                                        description = currentDesc,
+                                        startMillis = start,
+                                        stopMillis = stop
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-                line.startsWith("#EXTINF", ignoreCase = true) -> {
-                    val attributes = attributeRegex.findAll(line)
-                        .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
-
-                    pendingLogo = attributes["tvg-logo"]
-                    pendingCategory = attributes["group-title"]?.takeIf { it.isNotBlank() } ?: "Autres"
-                    pendingTvgId = attributes["tvg-id"]?.takeIf { it.isNotBlank() }
-                    pendingName = line.substringAfterLast(",").trim().ifBlank { "Chaîne sans nom" }
-                }
-                line.startsWith("#") -> {
-                }
-                else -> {
-                    val name = pendingName ?: "Chaîne sans nom"
-                    channels += Channel(
-                        id = pendingTvgId ?: UUID.nameUUIDFromBytes(line.toByteArray()).toString(),
-                        name = name,
-                        logoUrl = pendingLogo,
-                        streamUrl = line,
-                        category = pendingCategory,
-                        epgChannelId = pendingTvgId
-                    )
-                    pendingName = null
-                    pendingLogo = null
-                    pendingCategory = "Autres"
-                    pendingTvgId = null
-                }
+                eventType = parser.next()
             }
+        } catch (e: Exception) {
+            return programs
         }
-
-        return Playlist(channels)
+        return programs
     }
-}
+
+    private fun safeParseDate(
