@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.repository.EpgRepository
@@ -21,7 +22,10 @@ class PlayerViewModel @Inject constructor(
     private val epgRepository: EpgRepository
 ) : AndroidViewModel(application) {
 
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application).build()
+    private val renderersFactory = DefaultRenderersFactory(application)
+        .setEnableDecoderFallback(true)
+
+    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application, renderersFactory).build()
 
     private val _currentChannel = MutableStateFlow<Channel?>(null)
     val currentChannel: StateFlow<Channel?> = _currentChannel
