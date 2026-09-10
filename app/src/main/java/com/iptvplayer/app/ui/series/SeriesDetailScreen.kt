@@ -1,5 +1,6 @@
 package com.iptvplayer.app.ui.series
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ fun SeriesDetailScreen(
 ) {
     val episodes by viewModel.episodes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    BackHandler(onBack = onBack)
 
     LaunchedEffect(series.id) {
         viewModel.loadEpisodes(series.id)
