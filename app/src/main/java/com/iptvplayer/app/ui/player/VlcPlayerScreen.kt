@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
@@ -13,6 +14,8 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +38,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
+import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.Locale
 
@@ -41,6 +46,10 @@ import java.util.Locale
 fun VlcPlayerScreen(
     channel: Channel,
     viewModel: VlcPlayerViewModel = hiltViewModel(),
+    hasNext: Boolean = false,
+    hasPrevious: Boolean = false,
+    onNext: () -> Unit = {},
+    onPrevious: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -55,8 +64,24 @@ fun VlcPlayerScreen(
 
     var draggingPosition by remember { mutableStateOf<Float?>(null) }
 
+    var controlsVisible by remember { mutableStateOf(true) }
+    var interactionTick by remember { mutableStateOf(0) }
+
+    fun keepControlsVisible() {
+        controlsVisible = true
+        interactionTick++
+    }
+
+    LaunchedEffect(interactionTick) {
+        if (controlsVisible) {
+            delay(5000)
+            controlsVisible = false
+        }
+    }
+
     LaunchedEffect(channel.id) {
         viewModel.play(channel)
+        keepControlsVisible()
     }
 
     BackHandler(onBack = onBack)
@@ -83,7 +108,20 @@ fun VlcPlayerScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    if (controlsVisible) {
+                        controlsVisible = false
+                    } else {
+                        keepControlsVisible()
+                    }
+                })
+            }
+    ) {
         AndroidView(
             factory = { ctx ->
                 VLCVideoLayout(ctx).also { layout ->
@@ -120,86 +158,113 @@ fun VlcPlayerScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopStart)
-                .background(Color.Black.copy(alpha = 0.4f))
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
-            }
-            Text(
-                text = currentChannel?.name ?: channel.name,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = { viewModel.cycleAspectRatio() }) {
-                Icon(Icons.Filled.AspectRatio, contentDescription = "Ajuster l'image ($aspectLabel)", tint = Color.White)
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.5f))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            if (duration > 0) {
-                val sliderValue = draggingPosition ?: currentPosition.toFloat()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = formatMillis(sliderValue.toLong()),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { draggingPosition = it },
-                        onValueChangeFinished = {
-                            draggingPosition?.let { viewModel.seekTo(it.toLong()) }
-                            draggingPosition = null
-                        },
-                        valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                    )
-                    Text(
-                        text = formatMillis(duration),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-            }
-
+        if (controlsVisible) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopStart)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.seekRelative(-10_000) }) {
-                    Icon(Icons.Filled.Replay10, contentDescription = "Reculer de 10 secondes", tint = Color.White, modifier = Modifier.size(32.dp))
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
                 }
-                Spacer(modifier = Modifier.width(24.dp))
-                IconButton(onClick = { viewModel.togglePlayPause() }) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = "Lecture / Pause",
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp)
-                    )
+                Text(
+                    text = currentChannel?.name ?: channel.name,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { viewModel.cycleAspectRatio(); keepControlsVisible() }) {
+                    Icon(Icons.Filled.AspectRatio, contentDescription = "Ajuster l'image ($aspectLabel)", tint = Color.White)
                 }
-                Spacer(modifier = Modifier.width(24.dp))
-                IconButton(onClick = { viewModel.seekRelative(10_000) }) {
-                    Icon(Icons.Filled.Forward10, contentDescription = "Avancer de 10 secondes", tint = Color.White, modifier = Modifier.size(32.dp))
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                if (duration > 0) {
+                    val sliderValue = draggingPosition ?: currentPosition.toFloat()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = formatMillis(sliderValue.toLong()),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Slider(
+                            value = sliderValue,
+                            onValueChange = {
+                                draggingPosition = it
+                                keepControlsVisible()
+                            },
+                            onValueChangeFinished = {
+                                draggingPosition?.let { viewModel.seekTo(it.toLong()) }
+                                draggingPosition = null
+                            },
+                            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                        Text(
+                            text = formatMillis(duration),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { onPrevious(); keepControlsVisible() },
+                        enabled = hasPrevious
+                    ) {
+                        Icon(
+                            Icons.Filled.SkipPrevious,
+                            contentDescription = "Épisode précédent",
+                            tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    IconButton(onClick = { viewModel.seekRelative(-10_000); keepControlsVisible() }) {
+                        Icon(Icons.Filled.Replay10, contentDescription = "Reculer de 10 secondes", tint = Color.White, modifier = Modifier.size(30.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(onClick = { viewModel.togglePlayPause(); keepControlsVisible() }) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = "Lecture / Pause",
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(onClick = { viewModel.seekRelative(10_000); keepControlsVisible() }) {
+                        Icon(Icons.Filled.Forward10, contentDescription = "Avancer de 10 secondes", tint = Color.White, modifier = Modifier.size(30.dp))
+                    }
+                    IconButton(
+                        onClick = { onNext(); keepControlsVisible() },
+                        enabled = hasNext
+                    ) {
+                        Icon(
+                            Icons.Filled.SkipNext,
+                            contentDescription = "Épisode suivant",
+                            tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
                 }
             }
         }
