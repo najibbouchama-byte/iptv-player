@@ -7,13 +7,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +35,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.util.Locale
 
 @Composable
 fun VlcPlayerScreen(
@@ -43,6 +49,11 @@ fun VlcPlayerScreen(
     val currentChannel by viewModel.currentChannel.collectAsState()
     val isBuffering by viewModel.isBuffering.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val currentPosition by viewModel.currentPosition.collectAsState()
+    val duration by viewModel.duration.collectAsState()
+    val aspectLabel by viewModel.aspectLabel.collectAsState()
+
+    var draggingPosition by remember { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(channel.id) {
         viewModel.play(channel)
@@ -126,25 +137,83 @@ fun VlcPlayerScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { viewModel.cycleAspectRatio() }) {
+                Icon(Icons.Filled.AspectRatio, contentDescription = "Ajuster l'image ($aspectLabel)", tint = Color.White)
+            }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.4f))
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            IconButton(onClick = { viewModel.togglePlayPause() }) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Lecture / Pause",
-                    tint = Color.White,
-                    modifier = Modifier.size(48.dp)
-                )
+            if (duration > 0) {
+                val sliderValue = draggingPosition ?: currentPosition.toFloat()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = formatMillis(sliderValue.toLong()),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { draggingPosition = it },
+                        onValueChangeFinished = {
+                            draggingPosition?.let { viewModel.seekTo(it.toLong()) }
+                            draggingPosition = null
+                        },
+                        valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.White,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    )
+                    Text(
+                        text = formatMillis(duration),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { viewModel.seekRelative(-10_000) }) {
+                    Icon(Icons.Filled.Replay10, contentDescription = "Reculer de 10 secondes", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+                Spacer(modifier = Modifier.width(24.dp))
+                IconButton(onClick = { viewModel.togglePlayPause() }) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "Lecture / Pause",
+                        tint = Color.White,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(24.dp))
+                IconButton(onClick = { viewModel.seekRelative(10_000) }) {
+                    Icon(Icons.Filled.Forward10, contentDescription = "Avancer de 10 secondes", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
             }
         }
+    }
+}
+
+private fun formatMillis(millis: Long): String {
+    val totalSeconds = (millis / 1000).coerceAtLeast(0)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
 }
