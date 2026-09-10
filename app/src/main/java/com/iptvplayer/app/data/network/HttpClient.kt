@@ -33,4 +33,6 @@ class HttpClient @Inject constructor() {
             }
         }
     }
+
+    suspend fun fetchJson(url: String): String = fetchAndParse(url) { reader -> reader.readText() }
 }
