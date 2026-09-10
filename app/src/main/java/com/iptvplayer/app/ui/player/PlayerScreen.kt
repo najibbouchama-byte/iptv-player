@@ -42,16 +42,15 @@ fun PlayerScreen(
     val view = LocalView.current
     val isPlaying by viewModel.isPlaying.collectAsState()
     val currentChannel by viewModel.currentChannel.collectAsState()
+    val isBuffering by viewModel.isBuffering.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
-    // Lance la lecture de la chaîne demandée dès l'arrivée sur l'écran
     LaunchedEffect(channel.id) {
         viewModel.playChannel(channel)
     }
 
-    // Le bouton retour physique du téléphone doit fermer le lecteur, pas quitter l'application
     BackHandler(onBack = onBack)
 
-    // Passage en plein écran (masque barre de statut / navigation) tant que le lecteur est affiché
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val window = activity?.window
@@ -70,7 +69,6 @@ fun PlayerScreen(
                 WindowInsetsControllerCompat(window, view).show(WindowInsetsCompat.Type.systemBars())
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            // On repasse l'orientation en portrait en quittant le lecteur
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
@@ -90,7 +88,35 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Bandeau du haut : retour + nom de la chaîne + rotation écran
+        if (isBuffering && errorMessage == null) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White
+            )
+        }
+
+        if (errorMessage != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Impossible de lire ce flux",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = errorMessage ?: "",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,7 +143,6 @@ fun PlayerScreen(
             }
         }
 
-        // Contrôles du bas : précédent / play-pause / suivant
         Row(
             modifier = Modifier
                 .fillMaxWidth()
