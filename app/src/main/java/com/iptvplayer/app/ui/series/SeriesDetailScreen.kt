@@ -25,7 +25,7 @@ fun SeriesDetailScreen(
     series: Series,
     viewModel: SeriesDetailViewModel = hiltViewModel(),
     onBack: () -> Unit,
-    onEpisodeClick: (Channel) -> Unit
+    onPlayEpisodes: (List<Channel>, Int) -> Unit
 ) {
     val episodes by viewModel.episodes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -57,20 +57,22 @@ fun SeriesDetailScreen(
                 Text("Aucun épisode disponible", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         } else {
+            val channels = remember(episodes) {
+                episodes.map { episode ->
+                    Channel(
+                        id = episode.id,
+                        name = "S${episode.seasonNumber} E${episode.episodeNumber} — ${episode.title}",
+                        logoUrl = null,
+                        streamUrl = viewModel.streamUrlFor(episode) ?: "",
+                        category = "Séries",
+                        epgChannelId = null
+                    )
+                }
+            }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(episodes, key = { it.id }) { episode ->
-                    EpisodeRow(episode = episode, onClick = {
-                        val url = viewModel.streamUrlFor(episode) ?: return@EpisodeRow
-                        onEpisodeClick(
-                            Channel(
-                                id = episode.id,
-                                name = "S${episode.seasonNumber} E${episode.episodeNumber} — ${episode.title}",
-                                logoUrl = null,
-                                streamUrl = url,
-                                category = "Séries",
-                                epgChannelId = null
-                            )
-                        )
+                items(episodes.size, key = { episodes[it].id }) { index ->
+                    EpisodeRow(episode = episodes[index], onClick = {
+                        onPlayEpisodes(channels, index)
                     })
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
