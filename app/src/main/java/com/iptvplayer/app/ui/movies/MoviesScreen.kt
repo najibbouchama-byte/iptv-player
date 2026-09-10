@@ -1,0 +1,98 @@
+package com.iptvplayer.app.ui.movies
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.iptvplayer.app.data.model.Channel
+import com.iptvplayer.app.ui.common.PosterCard
+
+@Composable
+fun MoviesScreen(
+    viewModel: MoviesViewModel = hiltViewModel(),
+    onChannelClick: (Channel) -> Unit
+) {
+    val categories by viewModel.categories.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val movies by viewModel.movies.collectAsState()
+
+    LaunchedEffect(categories) {
+        if (selectedCategory == null && categories.isNotEmpty()) {
+            viewModel.selectCategory(categories.first())
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Films", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (categories.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(categories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = selectedCategory?.id == category.id,
+                    onClick = { viewModel.selectCategory(category) },
+                    label = { Text(category.name) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (movies.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Aucun film dans cette catégorie", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                state = gridState,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                items(movies, key = { it.id }) { movie ->
+                    PosterCard(
+                        title = movie.name,
+                        posterUrl = movie.posterUrl,
+                        showPoster = !gridState.isScrollInProgress,
+                        onClick = {
+                            val url = viewModel.streamUrlFor(movie) ?: return@PosterCard
+                            onChannelClick(
+                                Channel(
+                                    id = movie.id,
+                                    name = movie.name,
+                                    logoUrl = movie.posterUrl,
+                                    streamUrl = url,
+                                    category = "Films",
+                                    epgChannelId = null
+                                )
+                            )
+                        }
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
+        }
+    }
+}
