@@ -2,8 +2,7 @@ package com.iptvplayer.app.ui.series
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.iptvplayer.app.data.model.Series
-import com.iptvplayer.app.data.model.XtreamCategory
+import com.iptvplayer.app.data.model.Episode
 import com.iptvplayer.app.data.repository.XtreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,38 +12,27 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SeriesViewModel @Inject constructor(
+class SeriesDetailViewModel @Inject constructor(
     private val xtreamRepository: XtreamRepository
 ) : ViewModel() {
 
-    val categories = xtreamRepository.seriesCategories
-
-    private val _selectedCategory = MutableStateFlow<XtreamCategory?>(null)
-    val selectedCategory: StateFlow<XtreamCategory?> = _selectedCategory.asStateFlow()
-
-    private val _series = MutableStateFlow<List<Series>>(emptyList())
-    val series: StateFlow<List<Series>> = _series.asStateFlow()
+    private val _episodes = MutableStateFlow<List<Episode>>(emptyList())
+    val episodes: StateFlow<List<Episode>> = _episodes.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _selectedSeriesId = MutableStateFlow<String?>(null)
-    val selectedSeriesId: StateFlow<String?> = _selectedSeriesId.asStateFlow()
+    private var loadedForSeriesId: String? = null
 
-    fun selectSeries(id: String?) {
-        _selectedSeriesId.value = id
-    }
-
-    init {
-        viewModelScope.launch { xtreamRepository.loadSeriesCategoriesIfNeeded() }
-    }
-
-    fun selectCategory(category: XtreamCategory) {
-        _selectedCategory.value = category
+    fun loadEpisodes(seriesId: String) {
+        if (loadedForSeriesId == seriesId) return
+        loadedForSeriesId = seriesId
         viewModelScope.launch {
             _isLoading.value = true
-            _series.value = xtreamRepository.getSeries(category.id)
+            _episodes.value = xtreamRepository.getSeriesEpisodes(seriesId)
             _isLoading.value = false
         }
     }
+
+    fun streamUrlFor(episode: Episode): String? = xtreamRepository.episodeStreamUrl(episode)
 }
