@@ -9,12 +9,10 @@ import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Playlist
 import com.iptvplayer.app.data.network.HttpClient
 import com.iptvplayer.app.data.parser.M3uParser
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,10 +27,7 @@ class PlaylistRepository @Inject constructor(
     val playlist: StateFlow<Playlist?> = _playlist
 
     suspend fun loadPlaylist(url: String): Playlist {
-        val rawContent = httpClient.fetchText(url)
-        val parsed = withContext(Dispatchers.Default) {
-            M3uParser.parse(rawContent)
-        }
+        val parsed = httpClient.fetchAndParse(url) { reader -> M3uParser.parse(reader) }
         if (parsed.channels.isEmpty()) {
             throw IllegalStateException("La playlist ne contient aucune chaîne valide")
         }
