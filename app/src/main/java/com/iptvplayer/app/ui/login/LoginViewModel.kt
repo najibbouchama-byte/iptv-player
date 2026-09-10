@@ -3,7 +3,7 @@ package com.iptvplayer.app.ui.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iptvplayer.app.data.local.SecurePrefs
-import com.iptvplayer.app.data.repository.PlaylistRepository
+import com.iptvplayer.app.data.repository.XtreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +20,7 @@ sealed interface LoginUiState {
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val playlistRepository: PlaylistRepository,
+    private val xtreamRepository: XtreamRepository,
     private val securePrefs: SecurePrefs
 ) : ViewModel() {
 
@@ -42,10 +42,12 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = LoginUiState.Loading
             try {
-                playlistRepository.loadPlaylist(trimmedUrl)
+                val connected = xtreamRepository.connect(trimmedUrl)
+                if (!connected) {
+                    _uiState.value = LoginUiState.Error("INVALID_URL")
+                    return@launch
+                }
 
-                // On enregistre les informations UNIQUEMENT si l'utilisateur a coché "se souvenir de moi",
-                // et toujours dans le stockage chiffré (jamais en clair).
                 if (rememberMe) {
                     securePrefs.playlistUrl = trimmedUrl
                     securePrefs.profileName = profileName.trim()
