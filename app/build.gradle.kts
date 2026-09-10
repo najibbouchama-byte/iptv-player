@@ -97,7 +97,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.hilt:hilt-work:1.2.0")
     kapt("androidx.hilt:hilt-compiler:1.2.0")
-
+// Lecteur vidéo de secours (décodage logiciel universel)
+    implementation("org.videolan.android:libvlc-all:3.5.1")
     // Tests
     testImplementation("junit:junit:4.13.2")
 }
