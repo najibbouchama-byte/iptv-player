@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import com.iptvplayer.app.data.local.SecurePrefs
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.EpgProgram
 import com.iptvplayer.app.data.repository.EpgRepository
@@ -18,13 +20,26 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     application: Application,
-    private val epgRepository: EpgRepository
+    private val epgRepository: EpgRepository,
+    securePrefs: SecurePrefs
 ) : AndroidViewModel(application) {
 
     private val renderersFactory = DefaultRenderersFactory(application)
         .setEnableDecoderFallback(true)
 
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application, renderersFactory).build()
+    private val loadControl = run {
+        val minBufferMs = (securePrefs.minBufferSeconds * 1000).coerceAtLeast(1000)
+        val maxBufferMs = (securePrefs.maxBufferSeconds * 1000).coerceAtLeast(minBufferMs)
+        val playbackMs = minBufferMs.coerceAtMost(2000)
+        val playbackAfterRebufferMs = minBufferMs.coerceAtMost(5000)
+        DefaultLoadControl.Builder()
+            .setBufferDurationsMs(minBufferMs, maxBufferMs, playbackMs, playbackAfterRebufferMs)
+            .build()
+    }
+
+    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application, renderersFactory)
+        .setLoadControl(loadControl)
+        .build()
 
     private val _currentChannel = MutableStateFlow<Channel?>(null)
     val currentChannel: StateFlow<Channel?> = _currentChannel
