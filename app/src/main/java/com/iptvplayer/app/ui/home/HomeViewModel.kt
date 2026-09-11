@@ -9,6 +9,9 @@ import com.iptvplayer.app.data.repository.WatchProgressRepository
 import com.iptvplayer.app.data.repository.XtreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -115,6 +120,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Charge tout le catalogue (films + séries, toutes catégories) UNE seule fois,
+     * en lançant les requêtes réseau en parallèle (par lots de 6) plutôt que les
+     * unes après les autres, pour que la première recherche soit rapide.
+     */
     private suspend fun ensureFullIndexLoaded() {
         if (allMoviesIndex != null && allSeriesIndex != null) return
         _isIndexing.value = true
@@ -122,18 +132,18 @@ class HomeViewModel @Inject constructor(
             xtreamRepository.loadVodCategoriesIfNeeded()
             xtreamRepository.loadSeriesCategoriesIfNeeded()
 
-            val movies = mutableListOf<Movie>()
-            for (category in xtreamRepository.vodCategories.value) {
-                movies += xtreamRepository.getVodStreams(category.id)
-            }
+            val semaphore = Semaphore(6)
 
-            val series = mutableListOf<Series>()
-            for (category in xtreamRepository.seriesCategories.value) {
-                series += xtreamRepository.getSeries(category.id)
+            coroutineScope {
+                val movieDeferreds = xtreamRepository.vodCategories.value.map { category ->
+                    async { semaphore.withPermit { xtreamRepository.getVodStreams(category.id) } }
+                }
+                val seriesDeferreds = xtreamRepository.seriesCategories.value.map { category ->
+                    async { semaphore.withPermit { xtreamRepository.getSeries(category.id) } }
+                }
+                allMoviesIndex = movieDeferreds.awaitAll().flatten()
+                allSeriesIndex = seriesDeferreds.awaitAll().flatten()
             }
-
-            allMoviesIndex = movies
-            allSeriesIndex = series
         } finally {
             _isIndexing.value = false
         }
