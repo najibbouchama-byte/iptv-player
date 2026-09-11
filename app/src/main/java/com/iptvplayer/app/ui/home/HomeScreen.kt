@@ -27,7 +27,6 @@ fun HomeScreen(
     val continueWatching by viewModel.continueWatching.collectAsState()
     val newReleases by viewModel.newReleases.collectAsState()
     val categoryRows by viewModel.categoryRows.collectAsState()
-    val liveChannels by viewModel.liveChannels.collectAsState()
     val isLoading by viewModel.isLoadingDiscovery.collectAsState()
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -75,27 +74,6 @@ fun HomeScreen(
                 item { SectionHeader("Nouveautés") }
                 item {
                     MovieRowContent(movies = newReleases, viewModel = viewModel, onChannelClick = onChannelClick)
-                }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-            }
-
-            if (liveChannels.isNotEmpty()) {
-                item { SectionHeader("Chaînes populaires") }
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(liveChannels, key = { it.id }) { channel ->
-                            PosterCard(
-                                title = channel.name,
-                                posterUrl = channel.logoUrl,
-                                showPoster = true,
-                                onClick = { onChannelClick(channel) },
-                                modifier = Modifier.width(120.dp)
-                            )
-                        }
-                    }
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
             }
