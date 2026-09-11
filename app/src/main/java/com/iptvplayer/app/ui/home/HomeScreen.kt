@@ -1,6 +1,7 @@
 package com.iptvplayer.app.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,6 +26,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,6 +46,7 @@ fun HomeScreen(
     onSeriesClick: (Series) -> Unit = {}
 ) {
     val continueWatching by viewModel.continueWatching.collectAsState()
+    val topTen by viewModel.topTen.collectAsState()
     val newReleases by viewModel.newReleases.collectAsState()
     val categoryRows by viewModel.categoryRows.collectAsState()
     val isLoading by viewModel.isLoadingDiscovery.collectAsState()
@@ -52,6 +56,18 @@ fun HomeScreen(
     val searchMovies by viewModel.searchMovies.collectAsState()
     val searchSeries by viewModel.searchSeries.collectAsState()
     val isSearching = searchQuery.isNotBlank()
+
+    fun channelForMovie(movie: Movie): Channel? {
+        val url = viewModel.streamUrlFor(movie) ?: return null
+        return Channel(
+            id = movie.id,
+            name = movie.name,
+            logoUrl = movie.posterUrl,
+            streamUrl = url,
+            category = "Films",
+            epgChannelId = null
+        )
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -126,20 +142,14 @@ fun HomeScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                "Indexation du catalogue…",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
+                            Text("Indexation du catalogue…", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                         }
                     }
                 }
             } else if (searchMovies.isEmpty() && searchSeries.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Aucun résultat pour « $searchQuery »",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
+                        Text("Aucun résultat pour « $searchQuery »", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                 }
             } else {
@@ -151,19 +161,7 @@ fun HomeScreen(
                             items = searchMovies,
                             posterUrlOf = { it.posterUrl },
                             titleOf = { it.name },
-                            onClick = { movie ->
-                                val url = viewModel.streamUrlFor(movie) ?: return@SearchResultsGrid
-                                onChannelClick(
-                                    Channel(
-                                        id = movie.id,
-                                        name = movie.name,
-                                        logoUrl = movie.posterUrl,
-                                        streamUrl = url,
-                                        category = "Films",
-                                        epgChannelId = null
-                                    )
-                                )
-                            }
+                            onClick = { movie -> channelForMovie(movie)?.let(onChannelClick) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -202,9 +200,7 @@ fun HomeScreen(
                             showPoster = true,
                             progressFraction = item.progress,
                             onClick = { onChannelClick(item.channel) },
-                            modifier = Modifier
-                                .width(120.dp)
-                                .rowFocusScale(index, rowState)
+                            modifier = Modifier.width(120.dp).rowFocusScale(index, rowState)
                         )
                     }
                 }
@@ -219,10 +215,32 @@ fun HomeScreen(
                 }
             }
         } else {
+            if (topTen.isNotEmpty()) {
+                item { SectionHeader("Top 10 des films") }
+                item {
+                    val rowState = rememberLazyListState()
+                    LazyRow(
+                        state = rowState,
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        itemsIndexed(topTen, key = { _, movie -> movie.id }) { index, movie ->
+                            TopTenCard(
+                                rank = index + 1,
+                                movie = movie,
+                                onClick = { channelForMovie(movie)?.let(onChannelClick) },
+                                modifier = Modifier.rowFocusScale(index, rowState)
+                            )
+                        }
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+            }
+
             if (newReleases.isNotEmpty()) {
                 item { SectionHeader("Nouveautés") }
                 item {
-                    MovieRowContent(movies = newReleases, viewModel = viewModel, onChannelClick = onChannelClick)
+                    MovieRowContent(movies = newReleases, onChannelClick = { channelForMovie(it)?.let(onChannelClick) })
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
             }
@@ -230,7 +248,7 @@ fun HomeScreen(
             categoryRows.forEach { row ->
                 item { SectionHeader(row.title) }
                 item {
-                    MovieRowContent(movies = row.movies, viewModel = viewModel, onChannelClick = onChannelClick)
+                    MovieRowContent(movies = row.movies, onChannelClick = { channelForMovie(it)?.let(onChannelClick) })
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
             }
@@ -249,6 +267,38 @@ private fun SectionHeader(title: String) {
         modifier = Modifier.padding(horizontal = 16.dp)
     )
     Spacer(modifier = Modifier.height(10.dp))
+}
+
+@Composable
+private fun TopTenCard(
+    rank: Int,
+    movie: Movie,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.width(120.dp)) {
+        PosterCard(
+            title = movie.name,
+            posterUrl = movie.posterUrl,
+            showPoster = true,
+            onClick = onClick
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(6.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black.copy(alpha = 0.65f))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "$rank",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
 }
 
 @Composable
@@ -279,8 +329,7 @@ private fun <T> SearchResultsGrid(
 @Composable
 private fun MovieRowContent(
     movies: List<Movie>,
-    viewModel: HomeViewModel,
-    onChannelClick: (Channel) -> Unit
+    onChannelClick: (Movie) -> Unit
 ) {
     val rowState = rememberLazyListState()
     LazyRow(
@@ -293,22 +342,8 @@ private fun MovieRowContent(
                 title = movie.name,
                 posterUrl = movie.posterUrl,
                 showPoster = true,
-                onClick = {
-                    val url = viewModel.streamUrlFor(movie) ?: return@PosterCard
-                    onChannelClick(
-                        Channel(
-                            id = movie.id,
-                            name = movie.name,
-                            logoUrl = movie.posterUrl,
-                            streamUrl = url,
-                            category = "Films",
-                            epgChannelId = null
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .width(120.dp)
-                    .rowFocusScale(index, rowState)
+                onClick = { onChannelClick(movie) },
+                modifier = Modifier.width(120.dp).rowFocusScale(index, rowState)
             )
         }
     }
