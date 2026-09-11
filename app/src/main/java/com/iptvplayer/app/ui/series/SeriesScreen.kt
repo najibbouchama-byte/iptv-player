@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.ui.common.PosterCard
+import com.iptvplayer.app.ui.common.gridFocusScale
 
 @Composable
 fun SeriesScreen(
@@ -79,19 +81,20 @@ fun SeriesScreen(
                 Text("Aucune série dans cette catégorie", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         } else {
-            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+            val gridState = rememberLazyGridState()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(seriesList, key = { it.id }) { series ->
+                itemsIndexed(seriesList, key = { _, series -> series.id }) { index, series ->
                     PosterCard(
                         title = series.name,
                         posterUrl = series.posterUrl,
-                        showPoster = !gridState.isScrollInProgress,
-                        onClick = { selectedSeriesId = series.id }
+                        showPoster = true,
+                        onClick = { selectedSeriesId = series.id },
+                        modifier = Modifier.gridFocusScale(index, gridState)
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
