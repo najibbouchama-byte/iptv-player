@@ -28,3 +28,17 @@ data class Episode(
     val episodeNumber: Int,
     val containerExtension: String
 )
+
+/**
+ * Résultat de l'authentification native auprès de l'API Xtream Codes
+ * (appel à player_api.php sans action, qui renvoie le bloc "user_info").
+ */
+sealed interface XtreamAuthResult {
+    data class Success(
+        val expiresAt: String? = null,
+        val maxConnections: Int? = null,
+        val activeConnections: Int? = null
+    ) : XtreamAuthResult
+
+    data class Failure(val reason: String) : XtreamAuthResult
+}
