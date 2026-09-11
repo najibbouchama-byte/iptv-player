@@ -1,8 +1,10 @@
 package com.iptvplayer.app.ui.favorites
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LiveTv
@@ -68,7 +70,7 @@ fun FavoritesScreen(
                         .size(84.dp)
                         .background(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            shape = androidx.compose.foundation.shape.CircleShape
+                            shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
