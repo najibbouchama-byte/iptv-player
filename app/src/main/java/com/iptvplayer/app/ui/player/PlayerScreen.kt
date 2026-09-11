@@ -4,11 +4,16 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -42,6 +47,8 @@ import coil.compose.AsyncImage
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.ChannelLogos
 import com.iptvplayer.app.data.model.EpgProgram
+import com.iptvplayer.app.ui.common.rowFocusScale
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -62,8 +69,18 @@ fun PlayerScreen(
 
     val channel = channels.getOrNull(currentIndex) ?: channels.first()
 
+    var controlsVisible by remember { mutableStateOf(true) }
+    var interactionTick by remember { mutableStateOf(0) }
+
     LaunchedEffect(channel.id) {
         viewModel.playChannel(channel)
+    }
+
+    LaunchedEffect(controlsVisible, interactionTick) {
+        if (controlsVisible) {
+            delay(5000)
+            controlsVisible = false
+        }
     }
 
     BackHandler(onBack = onBack)
@@ -96,6 +113,11 @@ fun PlayerScreen(
         onIndexChange(safeIndex)
     }
 
+    fun revealControls() {
+        controlsVisible = true
+        interactionTick++
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = {
@@ -109,6 +131,23 @@ fun PlayerScreen(
                 }
             },
             modifier = Modifier.fillMaxSize()
+        )
+
+        // Zone tactile transparente : un tap affiche/masque les contrôles,
+        // sans intercepter les clics des boutons qui sont au-dessus.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    if (controlsVisible) {
+                        controlsVisible = false
+                    } else {
+                        revealControls()
+                    }
+                }
         )
 
         if (isBuffering && errorMessage == null) {
@@ -134,84 +173,100 @@ fun PlayerScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopStart)
-                .background(Color.Black.copy(alpha = 0.4f))
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = currentChannel?.name ?: channel.name,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                viewModel.currentProgramTitle()?.let {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
+                }
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = it,
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = currentChannel?.name ?: channel.name,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-            }
-            IconButton(onClick = { toggleOrientation(context as? Activity) }) {
-                Icon(Icons.Filled.ScreenRotation, contentDescription = "Rotation", tint = Color.White)
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.55f))
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { goTo(currentIndex - 1) }) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Chaîne précédente", tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                Spacer(modifier = Modifier.width(24.dp))
-                IconButton(onClick = { viewModel.togglePlayPause() }) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = "Lecture / Pause",
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(24.dp))
-                IconButton(onClick = { goTo(currentIndex + 1) }) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Chaîne suivante", tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-            }
-
-            if (channels.size > 1) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
-                        ZapChannelCard(
-                            channel = ch,
-                            selected = index == currentIndex,
-                            program = viewModel.programFor(ch.epgChannelId),
-                            onClick = { goTo(index) }
+                    viewModel.currentProgramTitle()?.let {
+                        Text(
+                            text = it,
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                IconButton(onClick = { toggleOrientation(context as? Activity) }) {
+                    Icon(Icons.Filled.ScreenRotation, contentDescription = "Rotation", tint = Color.White)
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val zapListState = rememberLazyListState()
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.55f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { revealControls(); goTo(currentIndex - 1) }) {
+                        Icon(Icons.Filled.SkipPrevious, contentDescription = "Chaîne précédente", tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(modifier = Modifier.width(24.dp))
+                    IconButton(onClick = { revealControls(); viewModel.togglePlayPause() }) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = "Lecture / Pause",
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(24.dp))
+                    IconButton(onClick = { revealControls(); goTo(currentIndex + 1) }) {
+                        Icon(Icons.Filled.SkipNext, contentDescription = "Chaîne suivante", tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                }
+
+                if (channels.size > 1) {
+                    LazyRow(
+                        state = zapListState,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+                            ZapChannelCard(
+                                channel = ch,
+                                selected = index == currentIndex,
+                                program = viewModel.programFor(ch.epgChannelId),
+                                onClick = { revealControls(); goTo(index) },
+                                modifier = Modifier.rowFocusScale(index, zapListState)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
     }
@@ -222,7 +277,8 @@ private fun ZapChannelCard(
     channel: Channel,
     selected: Boolean,
     program: EpgProgram?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.FRENCH) }
     val logoUrl = remember(channel.id, channel.logoUrl) {
@@ -230,7 +286,7 @@ private fun ZapChannelCard(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .width(120.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(if (selected) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f))
