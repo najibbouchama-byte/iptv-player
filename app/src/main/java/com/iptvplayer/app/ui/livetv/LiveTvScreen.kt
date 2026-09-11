@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,10 +35,12 @@ fun LiveTvScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isLoadingChannels by viewModel.isLoadingChannels.collectAsState()
     val channels by viewModel.channels.collectAsState()
+    val isIndexingChannels by viewModel.isIndexingChannels.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
     val programsByChannel by viewModel.epgRepository.programsByChannel.collectAsState()
 
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
-    val filteredChannels = remember(channels, searchQuery) { viewModel.filteredChannels() }
+    val isSearching = searchQuery.isNotBlank()
 
     var showCategorySheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
@@ -53,10 +58,44 @@ fun LiveTvScreen(
 
         OutlinedTextField(
             value = searchQuery,
-            onValueChange = viewModel::updateSearchQuery,
-            placeholder = { Text(stringResource(R.string.live_tv_search_hint)) },
+            onValueChange = { viewModel.updateSearchQuery(it) },
+            placeholder = {
+                Text(
+                    stringResource(R.string.live_tv_search_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
+            },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            textStyle = MaterialTheme.typography.bodyMedium,
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.updateSearchQuery("") }, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Effacer",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            },
+            shape = RoundedCornerShape(50),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -68,6 +107,53 @@ fun LiveTvScreen(
             return@Column
         }
 
+        if (isSearching) {
+            when {
+                isIndexingChannels -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "Indexation des chaînes…",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+                searchResults.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Aucune chaîne pour « $searchQuery »",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        itemsIndexed(searchResults, key = { _, ch -> ch.id }) { index, channel ->
+                            ChannelRow(
+                                channel = channel,
+                                isFavorite = favoriteIds.contains(channel.id),
+                                currentProgram = programsByChannel[channel.epgChannelId]
+                                    ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
+                                onClick = {
+                                    viewModel.recordWatched(channel)
+                                    onChannelClick(searchResults, index)
+                                },
+                                onToggleFavorite = { viewModel.toggleFavorite(channel) },
+                                showLogo = true
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(16.dp)) }
+                    }
+                }
+            }
+            return@Column
+        }
+
+        // Bouton "Catégorie" façon TiviMate : ouvre un panneau qui glisse
+        // depuis le bas avec la liste complète, plutôt qu'une rangée qui déborde.
         OutlinedButton(
             onClick = { showCategorySheet = true },
             modifier = Modifier.fillMaxWidth()
@@ -90,7 +176,7 @@ fun LiveTvScreen(
                     CircularProgressIndicator()
                 }
             }
-            filteredChannels.isEmpty() -> {
+            channels.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         stringResource(R.string.live_tv_no_channels),
@@ -100,7 +186,7 @@ fun LiveTvScreen(
             }
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    itemsIndexed(filteredChannels, key = { _, ch -> ch.id }) { index, channel ->
+                    itemsIndexed(channels, key = { _, ch -> ch.id }) { index, channel ->
                         ChannelRow(
                             channel = channel,
                             isFavorite = favoriteIds.contains(channel.id),
@@ -108,7 +194,7 @@ fun LiveTvScreen(
                                 ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
                             onClick = {
                                 viewModel.recordWatched(channel)
-                                onChannelClick(filteredChannels, index)
+                                onChannelClick(channels, index)
                             },
                             onToggleFavorite = { viewModel.toggleFavorite(channel) },
                             showLogo = true
