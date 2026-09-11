@@ -48,7 +48,7 @@ fun HomeScreen(
                 Image(
                     painter = painterResource(R.drawable.logo_infinity),
                     contentDescription = "Infinity Player",
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(100.dp)
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
