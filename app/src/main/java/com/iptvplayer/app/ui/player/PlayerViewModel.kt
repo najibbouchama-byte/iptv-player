@@ -8,8 +8,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.iptvplayer.app.data.model.Channel
+import com.iptvplayer.app.data.model.EpgProgram
 import com.iptvplayer.app.data.repository.EpgRepository
-import com.iptvplayer.app.data.repository.PlaylistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +18,6 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     application: Application,
-    private val playlistRepository: PlaylistRepository,
     private val epgRepository: EpgRepository
 ) : AndroidViewModel(application) {
 
@@ -72,20 +71,11 @@ class PlayerViewModel @Inject constructor(
         exoPlayer.playWhenReady = !exoPlayer.playWhenReady
     }
 
-    fun switchChannel(direction: Int) {
-        val all = playlistRepository.playlist.value?.channels ?: return
-        val current = _currentChannel.value ?: return
-        val currentIndex = all.indexOfFirst { it.id == current.id }
-        if (currentIndex == -1) return
-        val newIndex = (currentIndex + direction + all.size) % all.size
-        playChannel(all[newIndex])
-    }
-
     fun currentProgramTitle(): String? =
         epgRepository.currentProgram(_currentChannel.value?.epgChannelId)?.title
 
-    fun nextProgramTitle(): String? =
-        epgRepository.nextProgram(_currentChannel.value?.epgChannelId)?.title
+    fun programFor(epgChannelId: String?): EpgProgram? =
+        epgRepository.currentProgram(epgChannelId)
 
     override fun onCleared() {
         exoPlayer.release()
