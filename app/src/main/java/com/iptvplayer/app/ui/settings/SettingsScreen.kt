@@ -86,7 +86,7 @@ fun SettingsScreen(
                     } else {
                         Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(R.string.settings_sync_epg_now))
+                        Text("Synchroniser l'EPG", maxLines = 1))
                     }
                 }
             }
