@@ -4,10 +4,19 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,18 +30,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
+import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.ui.common.PosterCard
 import com.iptvplayer.app.ui.common.rowFocusScale
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onChannelClick: (Channel) -> Unit
+    onChannelClick: (Channel) -> Unit,
+    onSeriesClick: (Series) -> Unit = {}
 ) {
     val continueWatching by viewModel.continueWatching.collectAsState()
     val newReleases by viewModel.newReleases.collectAsState()
     val categoryRows by viewModel.categoryRows.collectAsState()
     val isLoading by viewModel.isLoadingDiscovery.collectAsState()
+
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val isIndexing by viewModel.isIndexing.collectAsState()
+    val searchMovies by viewModel.searchMovies.collectAsState()
+    val searchSeries by viewModel.searchSeries.collectAsState()
+    val isSearching = searchQuery.isNotBlank()
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -54,6 +71,92 @@ fun HomeScreen(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.updateSearchQuery(it) },
+                placeholder = { Text("Rechercher un film ou une série…") },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Effacer")
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        if (isSearching) {
+            if (isIndexing) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "Indexation du catalogue…",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            } else if (searchMovies.isEmpty() && searchSeries.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Aucun résultat pour « $searchQuery »",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            } else {
+                if (searchMovies.isNotEmpty()) {
+                    item { SectionHeader("Films (${searchMovies.size})") }
+                    item {
+                        SearchResultsGrid(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            items = searchMovies,
+                            posterUrlOf = { it.posterUrl },
+                            titleOf = { it.name },
+                            onClick = { movie ->
+                                val url = viewModel.streamUrlFor(movie) ?: return@SearchResultsGrid
+                                onChannelClick(
+                                    Channel(
+                                        id = movie.id,
+                                        name = movie.name,
+                                        logoUrl = movie.posterUrl,
+                                        streamUrl = url,
+                                        category = "Films",
+                                        epgChannelId = null
+                                    )
+                                )
+                            }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
+                }
+                if (searchSeries.isNotEmpty()) {
+                    item { SectionHeader("Séries (${searchSeries.size})") }
+                    item {
+                        SearchResultsGrid(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            items = searchSeries,
+                            posterUrlOf = { it.posterUrl },
+                            titleOf = { it.name },
+                            onClick = { onSeriesClick(it) }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
+                }
+            }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+            return@LazyColumn
         }
 
         if (continueWatching.isNotEmpty()) {
@@ -119,6 +222,31 @@ private fun SectionHeader(title: String) {
         modifier = Modifier.padding(horizontal = 16.dp)
     )
     Spacer(modifier = Modifier.height(10.dp))
+}
+
+@Composable
+private fun <T> SearchResultsGrid(
+    items: List<T>,
+    posterUrlOf: (T) -> String?,
+    titleOf: (T) -> String,
+    onClick: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = modifier.height(((items.size / 3 + 1) * 200).dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        items(items) { item ->
+            PosterCard(
+                title = titleOf(item),
+                posterUrl = posterUrlOf(item),
+                showPoster = true,
+                onClick = { onClick(item) }
+            )
+        }
+    }
 }
 
 @Composable
