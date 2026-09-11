@@ -65,7 +65,9 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             )
         } else {
             PlayerScreen(
-                channel = channel,
+                channels = playerQueue,
+                currentIndex = playerIndex,
+                onIndexChange = { playerIndex = it },
                 onBack = { playerQueue = emptyList(); playerIndex = 0 }
             )
         }
@@ -121,7 +123,10 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                 HomeScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
             }
             composable("live_tv") {
-                LiveTvScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
+                LiveTvScreen(onChannelClick = { channels, index ->
+                    playerQueue = channels
+                    playerIndex = index
+                })
             }
             composable("movies") {
                 MoviesScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
@@ -134,7 +139,10 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             }
             composable("favorites") {
                 FavoritesScreen(
-                    onChannelClick = { playerQueue = listOf(it); playerIndex = 0 },
+                    onChannelClick = { channels, index ->
+                        playerQueue = channels
+                        playerIndex = index
+                    },
                     onBrowseLiveTv = {
                         navController.navigate("live_tv") {
                             popUpTo(navController.graph.findStartDestination().id) {
