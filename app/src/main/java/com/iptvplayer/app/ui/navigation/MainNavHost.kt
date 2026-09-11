@@ -23,12 +23,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.iptvplayer.app.data.model.Channel
+import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.ui.favorites.FavoritesScreen
 import com.iptvplayer.app.ui.home.HomeScreen
 import com.iptvplayer.app.ui.livetv.LiveTvScreen
 import com.iptvplayer.app.ui.movies.MoviesScreen
 import com.iptvplayer.app.ui.player.PlayerScreen
 import com.iptvplayer.app.ui.player.VlcPlayerScreen
+import com.iptvplayer.app.ui.series.SeriesDetailScreen
 import com.iptvplayer.app.ui.series.SeriesScreen
 import com.iptvplayer.app.ui.settings.SettingsScreen
 
@@ -47,8 +49,23 @@ private val tabs = listOf(
 fun MainNavHost(onLoggedOut: () -> Unit) {
     var playerQueue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playerIndex by remember { mutableStateOf(0) }
+    var selectedSeriesForDetail by remember { mutableStateOf<Series?>(null) }
 
     val navController = rememberNavController()
+
+    val currentSeries = selectedSeriesForDetail
+    if (currentSeries != null && playerQueue.isEmpty()) {
+        SeriesDetailScreen(
+            series = currentSeries,
+            onBack = { selectedSeriesForDetail = null },
+            onPlayEpisodes = { channels, startIndex ->
+                playerQueue = channels
+                playerIndex = startIndex
+                selectedSeriesForDetail = null
+            }
+        )
+        return
+    }
 
     if (playerQueue.isNotEmpty()) {
         val channel = playerQueue[playerIndex]
@@ -120,7 +137,10 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("home") {
-                HomeScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
+                HomeScreen(
+                    onChannelClick = { playerQueue = listOf(it); playerIndex = 0 },
+                    onSeriesClick = { selectedSeriesForDetail = it }
+                )
             }
             composable("live_tv") {
                 LiveTvScreen(onChannelClick = { channels, index ->
