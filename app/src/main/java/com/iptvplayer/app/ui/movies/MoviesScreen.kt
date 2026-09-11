@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.ui.common.PosterCard
+import com.iptvplayer.app.ui.common.gridFocusScale
 
 @Composable
 fun MoviesScreen(
@@ -64,18 +66,18 @@ fun MoviesScreen(
                 Text("Aucun film dans cette catégorie", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         } else {
-            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+            val gridState = rememberLazyGridState()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(movies, key = { it.id }) { movie ->
+                itemsIndexed(movies, key = { _, movie -> movie.id }) { index, movie ->
                     PosterCard(
                         title = movie.name,
                         posterUrl = movie.posterUrl,
-                        showPoster = !gridState.isScrollInProgress,
+                        showPoster = true,
                         onClick = {
                             val url = viewModel.streamUrlFor(movie) ?: return@PosterCard
                             onChannelClick(
@@ -88,7 +90,8 @@ fun MoviesScreen(
                                     epgChannelId = null
                                 )
                             )
-                        }
+                        },
+                        modifier = Modifier.gridFocusScale(index, gridState)
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
