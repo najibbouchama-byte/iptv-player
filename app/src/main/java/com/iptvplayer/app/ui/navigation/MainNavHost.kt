@@ -1,6 +1,7 @@
 package com.iptvplayer.app.ui.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -10,6 +11,10 @@ import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -34,7 +39,7 @@ private val tabs = listOf(
     Tab("movies", "Films", Icons.Filled.Movie),
     Tab("series", "Séries", Icons.Filled.Theaters),
     Tab("favorites", "Favoris", Icons.Filled.Favorite),
-    Tab("settings", "Paramètres", Icons.Filled.Settings)
+    Tab("settings", "Réglages", Icons.Filled.Settings)
 )
 
 @Composable
@@ -84,8 +89,23 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) }
+                        icon = {
+                            Icon(
+                                tab.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp.let { it })
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = tab.label,
+                                fontSize = 10.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center
+                            )
+                        },
+                        alwaysShowLabel = true
                     )
                 }
             }
@@ -94,7 +114,7 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
         NavHost(
             navController = navController,
             startDestination = "home",
-            modifier = androidx.compose.ui.Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding)
         ) {
             composable("home") {
                 HomeScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
