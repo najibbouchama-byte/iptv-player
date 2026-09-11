@@ -3,7 +3,7 @@ package com.iptvplayer.app.ui.favorites
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -27,7 +27,7 @@ import com.iptvplayer.app.ui.livetv.LiveTvViewModel
 @Composable
 fun FavoritesScreen(
     viewModel: LiveTvViewModel = hiltViewModel(),
-    onChannelClick: (Channel) -> Unit,
+    onChannelClick: (List<Channel>, Int) -> Unit,
     onBrowseLiveTv: () -> Unit = {}
 ) {
     val favorites by viewModel.favorites.collectAsState(initial = emptyList())
@@ -97,13 +97,13 @@ fun FavoritesScreen(
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(favorites, key = { it.id }) { channel ->
+                itemsIndexed(favorites, key = { _, ch -> ch.id }) { index, channel ->
                     ChannelRow(
                         channel = channel,
                         isFavorite = true,
                         currentProgram = programsByChannel[channel.epgChannelId]
                             ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
-                        onClick = { onChannelClick(channel) },
+                        onClick = { onChannelClick(favorites, index) },
                         onToggleFavorite = { viewModel.toggleFavorite(channel) }
                     )
                 }
