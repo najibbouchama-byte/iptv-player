@@ -4,7 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +22,7 @@ import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.ui.common.PosterCard
+import com.iptvplayer.app.ui.common.rowFocusScale
 
 @Composable
 fun HomeScreen(
@@ -57,18 +59,22 @@ fun HomeScreen(
         if (continueWatching.isNotEmpty()) {
             item { SectionHeader("Reprendre la lecture") }
             item {
+                val rowState = rememberLazyListState()
                 LazyRow(
+                    state = rowState,
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(continueWatching, key = { it.channel.id }) { item ->
+                    itemsIndexed(continueWatching, key = { _, item -> item.channel.id }) { index, item ->
                         PosterCard(
                             title = item.channel.name,
                             posterUrl = item.channel.logoUrl,
                             showPoster = true,
                             progressFraction = item.progress,
                             onClick = { onChannelClick(item.channel) },
-                            modifier = Modifier.width(120.dp)
+                            modifier = Modifier
+                                .width(120.dp)
+                                .rowFocusScale(index, rowState)
                         )
                     }
                 }
@@ -121,11 +127,13 @@ private fun MovieRowContent(
     viewModel: HomeViewModel,
     onChannelClick: (Channel) -> Unit
 ) {
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(movies, key = { it.id }) { movie ->
+        itemsIndexed(movies, key = { _, movie -> movie.id }) { index, movie ->
             PosterCard(
                 title = movie.name,
                 posterUrl = movie.posterUrl,
@@ -143,7 +151,9 @@ private fun MovieRowContent(
                         )
                     )
                 },
-                modifier = Modifier.width(120.dp)
+                modifier = Modifier
+                    .width(120.dp)
+                    .rowFocusScale(index, rowState)
             )
         }
     }
