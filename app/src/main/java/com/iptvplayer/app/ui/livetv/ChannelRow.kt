@@ -4,17 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -22,7 +18,12 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Scale
 import com.iptvplayer.app.data.model.Channel
+import com.iptvplayer.app.data.model.ChannelLogos
 import com.iptvplayer.app.data.model.EpgProgram
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Icon
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -43,32 +44,7 @@ fun ChannelRow(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            if (channel.logoUrl != null && showLogo) {
-                AsyncImage(
-                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(channel.logoUrl)
-                        .size(96)
-                        .scale(Scale.FIT)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = channel.name,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Filled.Tv,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
+        ChannelLogo(channel = channel, showLogo = showLogo)
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -104,6 +80,76 @@ fun ChannelRow(
             modifier = Modifier
                 .size(22.dp)
                 .clip(RoundedCornerShape(50))
+        )
+    }
+}
+
+/**
+ * Logo de chaîne à 3 niveaux :
+ * 1. stream_icon fourni par le panel Xtream
+ * 2. logo de secours depuis la table ChannelLogos (repo communautaire)
+ * 3. badge avec les initiales sur fond coloré, pour ne jamais rester vide
+ */
+@Composable
+private fun ChannelLogo(channel: Channel, showLogo: Boolean) {
+    val resolvedUrl = ChannelLogos.resolve(channel.name, channel.logoUrl)
+
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        if (resolvedUrl != null && showLogo) {
+            AsyncImage(
+                model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(resolvedUrl)
+                    .size(96)
+                    .scale(Scale.FIT)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = channel.name,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            InitialsBadge(name = channel.name)
+        }
+    }
+}
+
+@Composable
+private fun InitialsBadge(name: String) {
+    val cleaned = name
+        .replace(Regex("[|#]"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+    val words = cleaned.split(" ").filter { it.isNotBlank() }
+    val initials = when {
+        words.size >= 2 -> "${words[0].first()}${words[1].first()}"
+        words.size == 1 && words[0].length >= 2 -> words[0].take(2)
+        words.size == 1 -> words[0]
+        else -> "?"
+    }.uppercase()
+
+    val palette = listOf(
+        Color(0xFFE63946), Color(0xFF3A86FF), Color(0xFF8338EC),
+        Color(0xFFFB5607), Color(0xFF2A9D8F), Color(0xFFE07A5F),
+        Color(0xFF06D6A0), Color(0xFFD62828)
+    )
+    val color = palette[(cleaned.hashCode() and 0x7FFFFFFF) % palette.size]
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initials,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
