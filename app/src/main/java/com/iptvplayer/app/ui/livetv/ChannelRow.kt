@@ -7,6 +7,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,14 +89,18 @@ fun ChannelRow(
 }
 
 /**
- * Logo de chaîne à 3 niveaux :
- * 1. stream_icon fourni par le panel Xtream
- * 2. logo de secours depuis la table ChannelLogos (repo communautaire)
- * 3. badge avec les initiales sur fond coloré, pour ne jamais rester vide
+ * Logo de chaîne avec bascule automatique en cas d'échec :
+ * 1. essaie le stream_icon du panel Xtream
+ * 2. si ça échoue (lien mort), essaie le logo de secours (repo tv-logos)
+ * 3. si ça échoue aussi, affiche un badge à initiales sur fond coloré
  */
 @Composable
 private fun ChannelLogo(channel: Channel, showLogo: Boolean) {
-    val resolvedUrl = ChannelLogos.resolve(channel.name, channel.logoUrl)
+    val candidates = remember(channel.id, channel.logoUrl) {
+        ChannelLogos.candidateUrls(channel.name, channel.logoUrl)
+    }
+    var attemptIndex by remember(channel.id, channel.logoUrl) { mutableStateOf(0) }
+    val currentUrl = candidates.getOrNull(attemptIndex)
 
     Box(
         modifier = Modifier
@@ -101,16 +109,17 @@ private fun ChannelLogo(channel: Channel, showLogo: Boolean) {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (resolvedUrl != null && showLogo) {
+        if (currentUrl != null && showLogo) {
             AsyncImage(
                 model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(resolvedUrl)
+                    .data(currentUrl)
                     .size(96)
                     .scale(Scale.FIT)
                     .crossfade(false)
                     .build(),
                 contentDescription = channel.name,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onError = { attemptIndex += 1 }
             )
         } else {
             InitialsBadge(name = channel.name)
