@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveTvScreen(
     viewModel: LiveTvViewModel = hiltViewModel(),
