@@ -3,10 +3,13 @@ package com.iptvplayer.app.ui.player
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.iptvplayer.app.data.model.Channel
+import com.iptvplayer.app.data.repository.WatchProgressRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -14,7 +17,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class VlcPlayerViewModel @Inject constructor(
-    application: Application
+    application: Application,
+    private val watchProgressRepository: WatchProgressRepository
 ) : AndroidViewModel(application) {
 
     private val libVLC = LibVLC(application, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
@@ -43,6 +47,9 @@ class VlcPlayerViewModel @Inject constructor(
     private val _aspectLabel = MutableStateFlow("Ajusté")
     val aspectLabel: StateFlow<String> = _aspectLabel
 
+    private var pendingResumePositionMs: Long? = null
+    private var progressSaveCounter = 0
+
     init {
         mediaPlayer.setEventListener { event ->
             when (event.type) {
@@ -50,6 +57,10 @@ class VlcPlayerViewModel @Inject constructor(
                     _isPlaying.value = true
                     _isBuffering.value = false
                     _errorMessage.value = null
+                    pendingResumePositionMs?.let { resumePos ->
+                        mediaPlayer.time = resumePos
+                        pendingResumePositionMs = null
+                    }
                 }
                 MediaPlayer.Event.Paused -> _isPlaying.value = false
                 MediaPlayer.Event.Buffering -> {
@@ -58,6 +69,10 @@ class VlcPlayerViewModel @Inject constructor(
                 MediaPlayer.Event.TimeChanged -> {
                     _currentPosition.value = event.timeChanged
                     _duration.value = mediaPlayer.length
+                    progressSaveCounter++
+                    if (progressSaveCounter % 5 == 0) {
+                        saveProgress()
+                    }
                 }
                 MediaPlayer.Event.EncounteredError -> {
                     _isBuffering.value = false
@@ -65,6 +80,7 @@ class VlcPlayerViewModel @Inject constructor(
                 }
                 MediaPlayer.Event.EndReached -> {
                     _isPlaying.value = false
+                    saveProgress()
                 }
             }
         }
@@ -92,6 +108,10 @@ class VlcPlayerViewModel @Inject constructor(
         _errorMessage.value = null
         _isBuffering.value = true
         _currentChannel.value = channel
+        progressSaveCounter = 0
+        viewModelScope.launch {
+            pendingResumePositionMs = watchProgressRepository.getSavedPosition(channel.id)
+        }
         val media = Media(libVLC, Uri.parse(channel.streamUrl))
         media.setHWDecoderEnabled(false, false)
         mediaPlayer.media = media
@@ -103,7 +123,18 @@ class VlcPlayerViewModel @Inject constructor(
         if (mediaPlayer.isPlaying) mediaPlayer.pause() else mediaPlayer.play()
     }
 
+    private fun saveProgress() {
+        val channel = _currentChannel.value ?: return
+        val position = mediaPlayer.time
+        val length = mediaPlayer.length
+        if (length <= 0) return
+        viewModelScope.launch {
+            watchProgressRepository.saveProgress(channel, position, length)
+        }
+    }
+
     override fun onCleared() {
+        saveProgress()
         mediaPlayer.stop()
         mediaPlayer.detachViews()
         mediaPlayer.release()
