@@ -171,11 +171,18 @@ fun SeriesDetailScreen(
 private fun cleanEpisodeTitle(rawTitle: String): String {
     val match = Regex("S\\d{1,2}\\s*E\\d{1,3}", RegexOption.IGNORE_CASE).find(rawTitle)
     val after = if (match != null) rawTitle.substring(match.range.last + 1) else rawTitle
-    return after.trim(' ', '-', ':', '.').ifBlank { rawTitle }
+    return after.trim(' ', '-', ':', '.').ifBlank { "" }
 }
 
 @Composable
 private fun EpisodeRow(episode: Episode, onClick: () -> Unit) {
+    val cleanedTitle = cleanEpisodeTitle(episode.title)
+    val displayText = if (cleanedTitle.isBlank()) {
+        "Épisode ${episode.episodeNumber}"
+    } else {
+        "Épisode ${episode.episodeNumber} : $cleanedTitle"
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,7 +193,7 @@ private fun EpisodeRow(episode: Episode, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Épisode ${episode.episodeNumber} : ${cleanEpisodeTitle(episode.title)}",
+            text = displayText,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
