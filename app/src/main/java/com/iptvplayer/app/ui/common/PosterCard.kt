@@ -26,7 +26,8 @@ fun PosterCard(
     posterUrl: String?,
     showPoster: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    progressFraction: Float? = null
 ) {
     Column(
         modifier = modifier
@@ -57,6 +58,26 @@ fun PosterCard(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
+            }
+
+            if (progressFraction != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(6.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
