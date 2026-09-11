@@ -8,8 +8,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Stocke les informations sensibles (URL de la playlist M3U, URL de l'EPG, nom du profil)
- * dans un fichier CHIFFRÉ sur le téléphone (AES-256), jamais en clair et jamais dans le code source.
+ * Stocke les informations sensibles (identifiants Xtream, URL de l'EPG, nom
+ * du profil) dans un fichier CHIFFRÉ sur le téléphone (AES-256), jamais en
+ * clair et jamais dans le code source.
  */
 @Singleton
 class SecurePrefs @Inject constructor(
@@ -27,6 +28,25 @@ class SecurePrefs @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
+    /** URL du serveur Xtream (ex: http://serveur.exemple:8080), sans player_api.php */
+    var xtreamServerUrl: String?
+        get() = prefs.getString(KEY_XTREAM_SERVER_URL, null)
+        set(value) = prefs.edit().putString(KEY_XTREAM_SERVER_URL, value).apply()
+
+    var xtreamUsername: String?
+        get() = prefs.getString(KEY_XTREAM_USERNAME, null)
+        set(value) = prefs.edit().putString(KEY_XTREAM_USERNAME, value).apply()
+
+    var xtreamPassword: String?
+        get() = prefs.getString(KEY_XTREAM_PASSWORD, null)
+        set(value) = prefs.edit().putString(KEY_XTREAM_PASSWORD, value).apply()
+
+    /** MODE_XTREAM ou MODE_M3U : indique comment la session a été créée */
+    var connectionMode: String?
+        get() = prefs.getString(KEY_CONNECTION_MODE, MODE_XTREAM)
+        set(value) = prefs.edit().putString(KEY_CONNECTION_MODE, value).apply()
+
+    /** Conservé pour compatibilité avec les sessions créées avant la migration, et pour l'affichage dans Paramètres */
     var playlistUrl: String?
         get() = prefs.getString(KEY_PLAYLIST_URL, null)
         set(value) = prefs.edit().putString(KEY_PLAYLIST_URL, value).apply()
@@ -43,7 +63,13 @@ class SecurePrefs @Inject constructor(
         get() = prefs.getBoolean(KEY_REMEMBER_ME, false)
         set(value) = prefs.edit().putBoolean(KEY_REMEMBER_ME, value).apply()
 
-    fun isLoggedIn(): Boolean = rememberMe && !playlistUrl.isNullOrBlank()
+    fun isLoggedIn(): Boolean {
+        if (!rememberMe) return false
+        val hasXtreamCredentials =
+            !xtreamServerUrl.isNullOrBlank() && !xtreamUsername.isNullOrBlank() && !xtreamPassword.isNullOrBlank()
+        val hasLegacyUrl = !playlistUrl.isNullOrBlank()
+        return hasXtreamCredentials || hasLegacyUrl
+    }
 
     fun clear() {
         prefs.edit().clear().apply()
@@ -54,5 +80,12 @@ class SecurePrefs @Inject constructor(
         private const val KEY_EPG_URL = "epg_url"
         private const val KEY_PROFILE_NAME = "profile_name"
         private const val KEY_REMEMBER_ME = "remember_me"
+        private const val KEY_XTREAM_SERVER_URL = "xtream_server_url"
+        private const val KEY_XTREAM_USERNAME = "xtream_username"
+        private const val KEY_XTREAM_PASSWORD = "xtream_password"
+        private const val KEY_CONNECTION_MODE = "connection_mode"
+
+        const val MODE_XTREAM = "XTREAM"
+        const val MODE_M3U = "M3U"
     }
 }
