@@ -1,5 +1,6 @@
 package com.iptvplayer.app.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,9 +13,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.ui.common.PosterCard
@@ -32,12 +35,22 @@ fun HomeScreen(
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Accueil",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Accueil",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Image(
+                    painter = painterResource(R.drawable.logo_infinity),
+                    contentDescription = "Infinity Player",
+                    modifier = Modifier.size(36.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
