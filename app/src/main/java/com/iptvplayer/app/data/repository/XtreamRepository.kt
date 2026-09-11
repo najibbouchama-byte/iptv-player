@@ -5,6 +5,7 @@ import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Episode
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.data.model.Series
+import com.iptvplayer.app.data.model.XtreamAuthResult
 import com.iptvplayer.app.data.model.XtreamCategory
 import com.iptvplayer.app.data.network.XtreamApi
 import com.iptvplayer.app.data.network.XtreamCredentials
@@ -35,22 +36,52 @@ class XtreamRepository @Inject constructor(
 
     val isConnected: Boolean get() = credentials != null
 
-    suspend fun connect(m3uUrl: String): Boolean {
-        val creds = XtreamCredentials.parse(m3uUrl) ?: return false
-        val categories = xtreamApi.getLiveCategories(creds)
-        credentials = creds
-        _liveCategories.value = categories
-        _vodCategories.value = emptyList()
-        _seriesCategories.value = emptyList()
-        liveStreamsCache.clear()
-        vodStreamsCache.clear()
-        seriesCache.clear()
-        return true
+    /**
+     * Connexion native à l'API Xtream Codes avec des identifiants explicites
+     * (URL serveur + username + password). Authentifie réellement le compte
+     * auprès du serveur avant de charger les catégories live.
+     */
+    suspend fun connect(credentials: XtreamCredentials): XtreamAuthResult {
+        val result = xtreamApi.authenticate(credentials)
+        if (result is XtreamAuthResult.Success) {
+            val categories = xtreamApi.getLiveCategories(credentials)
+            this.credentials = credentials
+            _liveCategories.value = categories
+            _vodCategories.value = emptyList()
+            _seriesCategories.value = emptyList()
+            liveStreamsCache.clear()
+            vodStreamsCache.clear()
+            seriesCache.clear()
+        }
+        return result
+    }
+
+    /**
+     * Connexion "legacy" à partir d'un lien unique contenant déjà les
+     * identifiants (ex: http://serveur:port/get.php?username=X&password=Y&type=m3u_plus).
+     * Utilisée par le mode "Je n'ai qu'un lien M3U" de l'écran de connexion.
+     */
+    suspend fun connect(m3uUrl: String): XtreamAuthResult {
+        val creds = XtreamCredentials.parse(m3uUrl)
+            ?: return XtreamAuthResult.Failure("Ce lien ne contient pas d'identifiants Xtream valides (username/password manquants)")
+        return connect(creds)
     }
 
     suspend fun reconnectFromSavedUrl(): Boolean {
-        val url = securePrefs.playlistUrl ?: return false
-        return connect(url)
+        val creds = savedCredentials() ?: return false
+        return connect(creds) is XtreamAuthResult.Success
+    }
+
+    private fun savedCredentials(): XtreamCredentials? {
+        val server = securePrefs.xtreamServerUrl
+        val username = securePrefs.xtreamUsername
+        val password = securePrefs.xtreamPassword
+        if (!server.isNullOrBlank() && !username.isNullOrBlank() && !password.isNullOrBlank()) {
+            return XtreamCredentials(server, username, password)
+        }
+        // Compatibilité avec une session enregistrée avant la migration Xtream native
+        val legacyUrl = securePrefs.playlistUrl ?: return null
+        return XtreamCredentials.parse(legacyUrl)
     }
 
     suspend fun loadVodCategoriesIfNeeded() {
