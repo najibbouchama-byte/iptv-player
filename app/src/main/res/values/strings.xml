@@ -2,14 +2,25 @@
     <string name="app_name">IPTV Player</string>
 
     <string name="login_title">Connexion</string>
-    <string name="login_url_label">URL de la playlist M3U</string>
+    <string name="login_app_title">Infinity Player</string>
+    <string name="login_subtitle_xtream">Connectez-vous avec vos identifiants Xtream</string>
+    <string name="login_subtitle_m3u">Connectez-vous avec votre playlist M3U</string>
     <string name="login_name_label">Nom du profil (optionnel)</string>
+    <string name="login_server_url_label">URL du serveur (ex: http://serveur:port)</string>
+    <string name="login_url_label">URL de la playlist M3U</string>
+    <string name="login_username_label">Nom d\'utilisateur</string>
+    <string name="login_password_label">Mot de passe</string>
+    <string name="login_epg_url_label">URL EPG (optionnel)</string>
     <string name="login_remember">Se souvenir de moi sur cet appareil</string>
     <string name="login_button">Connexion</string>
-    <string name="login_error_empty_url">Merci de saisir une URL M3U</string>
+    <string name="login_switch_to_m3u">Je n\'ai pas d\'identifiants, seulement un lien (m3u)</string>
+    <string name="login_switch_to_xtream">J\'ai des identifiants Xtream</string>
+    <string name="login_error_empty_url">Merci de saisir une URL</string>
     <string name="login_error_invalid_url">L\'URL saisie n\'est pas valide</string>
-    <string name="login_error_network">Impossible de charger la playlist. Vérifiez votre connexion ou l\'URL</string>
-    <string name="login_loading">Chargement de la playlist…</string>
+    <string name="login_error_missing_credentials">Merci de saisir un nom d\'utilisateur et un mot de passe</string>
+    <string name="login_error_invalid_m3u_link">Ce lien ne contient pas d\'identifiants Xtream valides</string>
+    <string name="login_error_network">Impossible de se connecter. Vérifiez votre connexion ou vos identifiants</string>
+    <string name="login_loading">Connexion en cours…</string>
 
     <string name="home_title">Accueil</string>
     <string name="home_recent">Dernières chaînes regardées</string>
