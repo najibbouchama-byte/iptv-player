@@ -133,7 +133,18 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                 })
             }
             composable("favorites") {
-                FavoritesScreen(onChannelClick = { playerQueue = listOf(it); playerIndex = 0 })
+                FavoritesScreen(
+                    onChannelClick = { playerQueue = listOf(it); playerIndex = 0 },
+                    onBrowseLiveTv = {
+                        navController.navigate("live_tv") {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable("settings") {
                 SettingsScreen(onLoggedOut = onLoggedOut)
