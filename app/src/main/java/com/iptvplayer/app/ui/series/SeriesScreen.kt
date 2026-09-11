@@ -1,12 +1,9 @@
 package com.iptvplayer.app.ui.series
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,9 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
-import com.iptvplayer.app.data.model.Series
+import com.iptvplayer.app.ui.common.CategorySelectorButton
 import com.iptvplayer.app.ui.common.PosterCard
-import com.iptvplayer.app.ui.common.gridFocusScale
 
 @Composable
 fun SeriesScreen(
@@ -60,15 +56,12 @@ fun SeriesScreen(
             return@Column
         }
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(categories, key = { it.id }) { category ->
-                FilterChip(
-                    selected = selectedCategory?.id == category.id,
-                    onClick = { viewModel.selectCategory(category) },
-                    label = { Text(category.name) }
-                )
-            }
-        }
+        CategorySelectorButton(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            placeholder = "Catégories",
+            onSelect = { viewModel.selectCategory(it) }
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -81,20 +74,17 @@ fun SeriesScreen(
                 Text("Aucune série dans cette catégorie", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         } else {
-            val gridState = rememberLazyGridState()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                state = gridState,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                itemsIndexed(seriesList, key = { _, series -> series.id }) { index, series ->
+                items(seriesList, key = { it.id }) { series ->
                     PosterCard(
                         title = series.name,
                         posterUrl = series.posterUrl,
                         showPoster = true,
-                        onClick = { selectedSeriesId = series.id },
-                        modifier = Modifier.gridFocusScale(index, gridState)
+                        onClick = { selectedSeriesId = series.id }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
