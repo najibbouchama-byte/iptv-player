@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
+import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.data.repository.WatchProgressRepository
 import com.iptvplayer.app.data.repository.XtreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +47,24 @@ class HomeViewModel @Inject constructor(
     private val _isLoadingDiscovery = MutableStateFlow(true)
     val isLoadingDiscovery: StateFlow<Boolean> = _isLoadingDiscovery
 
+    // --- Recherche ---
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
+
+    private val _isIndexing = MutableStateFlow(false)
+    val isIndexing: StateFlow<Boolean> = _isIndexing
+
+    private val _searchMovies = MutableStateFlow<List<Movie>>(emptyList())
+    val searchMovies: StateFlow<List<Movie>> = _searchMovies
+
+    private val _searchSeries = MutableStateFlow<List<Series>>(emptyList())
+    val searchSeries: StateFlow<List<Series>> = _searchSeries
+
+    private var allMoviesIndex: List<Movie>? = null
+    private var allSeriesIndex: List<Series>? = null
+    private var searchJob: Job? = null
+
     init {
         viewModelScope.launch { loadDiscoveryContent() }
     }
@@ -70,6 +91,51 @@ class HomeViewModel @Inject constructor(
             _newReleases.value = (recentOnes.ifEmpty { allMovies }).take(12)
         } finally {
             _isLoadingDiscovery.value = false
+        }
+    }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            _searchMovies.value = emptyList()
+            _searchSeries.value = emptyList()
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(300)
+            ensureFullIndexLoaded()
+            val q = query.trim()
+            _searchMovies.value = allMoviesIndex.orEmpty()
+                .filter { it.name.contains(q, ignoreCase = true) }
+                .take(30)
+            _searchSeries.value = allSeriesIndex.orEmpty()
+                .filter { it.name.contains(q, ignoreCase = true) }
+                .take(30)
+        }
+    }
+
+    private suspend fun ensureFullIndexLoaded() {
+        if (allMoviesIndex != null && allSeriesIndex != null) return
+        _isIndexing.value = true
+        try {
+            xtreamRepository.loadVodCategoriesIfNeeded()
+            xtreamRepository.loadSeriesCategoriesIfNeeded()
+
+            val movies = mutableListOf<Movie>()
+            for (category in xtreamRepository.vodCategories.value) {
+                movies += xtreamRepository.getVodStreams(category.id)
+            }
+
+            val series = mutableListOf<Series>()
+            for (category in xtreamRepository.seriesCategories.value) {
+                series += xtreamRepository.getSeries(category.id)
+            }
+
+            allMoviesIndex = movies
+            allSeriesIndex = series
+        } finally {
+            _isIndexing.value = false
         }
     }
 
