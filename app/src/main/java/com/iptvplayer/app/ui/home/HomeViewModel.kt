@@ -41,9 +41,6 @@ class HomeViewModel @Inject constructor(
     private val _categoryRows = MutableStateFlow<List<MovieRow>>(emptyList())
     val categoryRows: StateFlow<List<MovieRow>> = _categoryRows
 
-    private val _liveChannels = MutableStateFlow<List<Channel>>(emptyList())
-    val liveChannels: StateFlow<List<Channel>> = _liveChannels
-
     private val _isLoadingDiscovery = MutableStateFlow(true)
     val isLoadingDiscovery: StateFlow<Boolean> = _isLoadingDiscovery
 
@@ -71,11 +68,6 @@ class HomeViewModel @Inject constructor(
             val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
             val recentOnes = allMovies.filter { it.name.contains(currentYear) }
             _newReleases.value = (recentOnes.ifEmpty { allMovies }).take(12)
-
-            val liveCategories = xtreamRepository.liveCategories.value
-            if (liveCategories.isNotEmpty()) {
-                _liveChannels.value = xtreamRepository.getLiveStreams(liveCategories.first().id).take(12)
-            }
         } finally {
             _isLoadingDiscovery.value = false
         }
