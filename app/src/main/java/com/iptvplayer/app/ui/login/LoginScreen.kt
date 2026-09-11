@@ -45,7 +45,7 @@ fun LoginScreen(
             Image(
                 painter = painterResource(R.drawable.logo_infinity),
                 contentDescription = "Infinity Player",
-                modifier = Modifier.size(96.dp)
+                modifier = Modifier.size(140.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
