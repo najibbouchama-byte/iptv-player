@@ -163,6 +163,17 @@ fun SeriesDetailScreen(
     }
 }
 
+/**
+ * Les panels Xtream collent souvent le nom de la série + le code saison/épisode
+ * dans le titre brut (ex: "Dexter (2025) - S01E01 - A Beating Heart").
+ * On ne garde que la partie utile après le code SxxExx.
+ */
+private fun cleanEpisodeTitle(rawTitle: String): String {
+    val match = Regex("S\\d{1,2}\\s*E\\d{1,3}", RegexOption.IGNORE_CASE).find(rawTitle)
+    val after = if (match != null) rawTitle.substring(match.range.last + 1) else rawTitle
+    return after.trim(' ', '-', ':', '.').ifBlank { rawTitle }
+}
+
 @Composable
 private fun EpisodeRow(episode: Episode, onClick: () -> Unit) {
     Row(
@@ -174,28 +185,14 @@ private fun EpisodeRow(episode: Episode, onClick: () -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "${episode.episodeNumber}",
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = episode.title,
+            text = "Épisode ${episode.episodeNumber} : ${cleanEpisodeTitle(episode.title)}",
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        Spacer(modifier = Modifier.width(8.dp))
         Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
     }
 }
