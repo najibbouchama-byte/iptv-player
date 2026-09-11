@@ -3,6 +3,7 @@ package com.iptvplayer.app.data.network
 import com.iptvplayer.app.data.model.Episode
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.data.model.Series
+import com.iptvplayer.app.data.model.XtreamAuthResult
 import com.iptvplayer.app.data.model.XtreamCategory
 import org.json.JSONArray
 import org.json.JSONObject
@@ -13,6 +14,33 @@ import javax.inject.Singleton
 class XtreamApi @Inject constructor(
     private val httpClient: HttpClient
 ) {
+
+    /**
+     * Authentification native contre l'API Xtream Codes : vérifie que le
+     * serveur, le username et le password sont valides avant de charger quoi
+     * que ce soit d'autre. player_api.php sans "action" renvoie un bloc
+     * "user_info" avec le statut réel du compte.
+     */
+    suspend fun authenticate(creds: XtreamCredentials): XtreamAuthResult {
+        val json = httpClient.fetchJson(creds.apiBaseUrl)
+        val root = JSONObject(json)
+        val userInfo = root.optJSONObject("user_info")
+            ?: return XtreamAuthResult.Failure("Réponse inattendue du serveur. Vérifiez l'URL saisie")
+
+        val authOk = userInfo.optInt("auth", 0) == 1
+        if (!authOk) {
+            return XtreamAuthResult.Failure("Identifiants refusés. Vérifiez le nom d'utilisateur et le mot de passe")
+        }
+        if (userInfo.optString("status").equals("Expired", ignoreCase = true)) {
+            return XtreamAuthResult.Failure("Cet abonnement Xtream est expiré")
+        }
+
+        return XtreamAuthResult.Success(
+            expiresAt = userInfo.optString("exp_date").takeIf { it.isNotBlank() && it != "null" },
+            maxConnections = userInfo.optString("max_connections").toIntOrNull(),
+            activeConnections = userInfo.optString("active_cons").toIntOrNull()
+        )
+    }
 
     suspend fun getLiveCategories(creds: XtreamCredentials): List<XtreamCategory> {
         val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_live_categories")
