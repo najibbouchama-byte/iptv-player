@@ -4,10 +4,12 @@ import java.text.Normalizer
 import java.util.Locale
 
 /**
- * Résout un logo de chaîne : priorité au logo fourni par le panel Xtream
- * (stream_icon). S'il est absent, on cherche dans une table de correspondance
- * vers le repo communautaire tv-logo/tv-logos (logos gratuits, licence CC).
- * Si aucune correspondance n'est trouvée, l'UI affichera un badge à initiales.
+ * Résout les logos de chaîne. Comme beaucoup de panels Xtream fournissent
+ * des URLs de logo cassées ou mortes, on ne fait plus confiance à une seule
+ * source : candidateUrls() renvoie une liste ordonnée (logo du panel, puis
+ * logo de secours depuis le repo communautaire tv-logo/tv-logos) que l'UI
+ * essaie une par une, en passant au suivant si le chargement échoue.
+ * Si toutes échouent, l'UI affiche un badge à initiales.
  *
  * Pour ajouter une chaîne : trouve son fichier sur
  * https://github.com/tv-logo/tv-logos/tree/main/countries/france
@@ -86,6 +88,7 @@ object ChannelLogos {
         "canal plus moto gp" to "canal-plus-moto-gp-fr.png",
         "canal plus outremer" to "canal-plus-outremer-fr.png",
         "canal plus premier league" to "canal-plus-premier-league-fr.png",
+        "canal plus pl" to "canal-plus-premier-league-fr.png",
         "canal plus series" to "canal-plus-series-fr.png",
         "canal plus sport 360" to "canal-plus-sport-360-fr.png",
         "canal plus sport" to "canal-plus-sport-fr.png",
@@ -249,9 +252,20 @@ object ChannelLogos {
         "automoto" to "automoto-la-chaine-fr.png"
     )
 
-    fun resolve(channelName: String, streamIconUrl: String?): String? {
-        if (!streamIconUrl.isNullOrBlank()) return streamIconUrl
+    /**
+     * Renvoie la liste ordonnée des URLs à essayer pour cette chaîne :
+     * d'abord le logo du panel (s'il existe), puis notre logo de secours.
+     * L'UI doit essayer chaque URL dans l'ordre et passer à la suivante
+     * si le chargement échoue.
+     */
+    fun candidateUrls(channelName: String, streamIconUrl: String?): List<String> {
+        val urls = mutableListOf<String>()
+        if (!streamIconUrl.isNullOrBlank()) urls += streamIconUrl
+        lookup(channelName)?.let { urls += it }
+        return urls
+    }
 
+    private fun lookup(channelName: String): String? {
         val normalized = normalize(channelName)
         val match = knownLogos.entries.firstOrNull { (keyword, _) -> normalized.contains(keyword) }
         return match?.let { BASE_URL + it.value }
