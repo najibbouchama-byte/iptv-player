@@ -1,158 +1,133 @@
-package com.iptvplayer.app.data.network
+package com.iptvplayer.app.data.repository
 
+import com.iptvplayer.app.data.local.SecurePrefs
+import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Episode
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.data.model.XtreamAuthResult
 import com.iptvplayer.app.data.model.XtreamCategory
-import org.json.JSONArray
-import org.json.JSONObject
+import com.iptvplayer.app.data.network.XtreamApi
+import com.iptvplayer.app.data.network.XtreamCredentials
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class XtreamApi @Inject constructor(
-    private val httpClient: HttpClient
+class XtreamRepository @Inject constructor(
+    private val xtreamApi: XtreamApi,
+    private val securePrefs: SecurePrefs
 ) {
+    private var credentials: XtreamCredentials? = null
+
+    private val _liveCategories = MutableStateFlow<List<XtreamCategory>>(emptyList())
+    val liveCategories: StateFlow<List<XtreamCategory>> = _liveCategories
+
+    private val _vodCategories = MutableStateFlow<List<XtreamCategory>>(emptyList())
+    val vodCategories: StateFlow<List<XtreamCategory>> = _vodCategories
+
+    private val _seriesCategories = MutableStateFlow<List<XtreamCategory>>(emptyList())
+    val seriesCategories: StateFlow<List<XtreamCategory>> = _seriesCategories
+
+    private val liveStreamsCache = mutableMapOf<String, List<Channel>>()
+    private val vodStreamsCache = mutableMapOf<String, List<Movie>>()
+    private val seriesCache = mutableMapOf<String, List<Series>>()
+
+    val isConnected: Boolean get() = credentials != null
 
     /**
-     * Authentification native contre l'API Xtream Codes : vérifie que le
-     * serveur, le username et le password sont valides avant de charger quoi
-     * que ce soit d'autre. player_api.php sans "action" renvoie un bloc
-     * "user_info" avec le statut réel du compte.
+     * Connexion native à l'API Xtream Codes avec des identifiants explicites
+     * (URL serveur + username + password). Authentifie réellement le compte
+     * auprès du serveur avant de charger les catégories live.
      */
-    suspend fun authenticate(creds: XtreamCredentials): XtreamAuthResult {
-        val json = httpClient.fetchJson(creds.apiBaseUrl)
-        val root = JSONObject(json)
-        val userInfo = root.optJSONObject("user_info")
-            ?: return XtreamAuthResult.Failure("Réponse inattendue du serveur. Vérifiez l'URL saisie")
-
-        val authOk = userInfo.optInt("auth", 0) == 1
-        if (!authOk) {
-            return XtreamAuthResult.Failure("Identifiants refusés. Vérifiez le nom d'utilisateur et le mot de passe")
-        }
-        if (userInfo.optString("status").equals("Expired", ignoreCase = true)) {
-            return XtreamAuthResult.Failure("Cet abonnement Xtream est expiré")
-        }
-
-        return XtreamAuthResult.Success(
-            expiresAt = userInfo.optString("exp_date").takeIf { it.isNotBlank() && it != "null" },
-            maxConnections = userInfo.optString("max_connections").toIntOrNull(),
-            activeConnections = userInfo.optString("active_cons").toIntOrNull()
-        )
-    }
-
-    suspend fun getLiveCategories(creds: XtreamCredentials): List<XtreamCategory> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_live_categories")
-        return parseCategories(json)
-    }
-
-    suspend fun getVodCategories(creds: XtreamCredentials): List<XtreamCategory> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_vod_categories")
-        return parseCategories(json)
-    }
-
-    suspend fun getSeriesCategories(creds: XtreamCredentials): List<XtreamCategory> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_series_categories")
-        return parseCategories(json)
-    }
-
-    suspend fun getLiveStreams(creds: XtreamCredentials, categoryId: String): List<com.iptvplayer.app.data.model.Channel> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_live_streams&category_id=$categoryId")
-        val array = JSONArray(json)
-        val result = mutableListOf<com.iptvplayer.app.data.model.Channel>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            val streamId = obj.optString("stream_id")
-            val name = obj.optString("name", "Chaîne sans nom")
-            val icon = obj.optString("stream_icon").takeIf { it.isNotBlank() }
-            val epgId = obj.optString("epg_channel_id").takeIf { it.isNotBlank() }
-            val streamUrl = "${creds.baseUrl}/live/${creds.username}/${creds.password}/$streamId.ts"
-            result += com.iptvplayer.app.data.model.Channel(
-                id = streamId,
-                name = name,
-                logoUrl = icon,
-                streamUrl = streamUrl,
-                category = categoryId,
-                epgChannelId = epgId
-            )
+    suspend fun connect(credentials: XtreamCredentials): XtreamAuthResult {
+        val result = xtreamApi.authenticate(credentials)
+        if (result is XtreamAuthResult.Success) {
+            val categories = xtreamApi.getLiveCategories(credentials)
+            this.credentials = credentials
+            _liveCategories.value = categories
+            _vodCategories.value = emptyList()
+            _seriesCategories.value = emptyList()
+            liveStreamsCache.clear()
+            vodStreamsCache.clear()
+            seriesCache.clear()
         }
         return result
     }
 
-    suspend fun getVodStreams(creds: XtreamCredentials, categoryId: String): List<Movie> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_vod_streams&category_id=$categoryId")
-        val array = JSONArray(json)
-        val result = mutableListOf<Movie>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            result += Movie(
-                id = obj.optString("stream_id"),
-                name = obj.optString("name", "Film sans titre"),
-                posterUrl = obj.optString("stream_icon").takeIf { it.isNotBlank() },
-                categoryId = categoryId,
-                containerExtension = obj.optString("container_extension", "mp4")
-            )
-        }
-        return result
+    /**
+     * Connexion "legacy" à partir d'un lien unique contenant déjà les
+     * identifiants (ex: http://serveur:port/get.php?username=X&password=Y&type=m3u_plus).
+     * Utilisée par le mode "Je n'ai qu'un lien M3U" de l'écran de connexion.
+     */
+    suspend fun connect(m3uUrl: String): XtreamAuthResult {
+        val creds = XtreamCredentials.parse(m3uUrl)
+            ?: return XtreamAuthResult.Failure("Ce lien ne contient pas d'identifiants Xtream valides (username/password manquants)")
+        return connect(creds)
     }
 
-    suspend fun getSeries(creds: XtreamCredentials, categoryId: String): List<Series> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_series&category_id=$categoryId")
-        val array = JSONArray(json)
-        val result = mutableListOf<Series>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            result += Series(
-                id = obj.optString("series_id"),
-                name = obj.optString("name", "Série sans titre"),
-                posterUrl = obj.optString("cover").takeIf { it.isNotBlank() },
-                categoryId = categoryId,
-                plot = obj.optString("plot").takeIf { it.isNotBlank() }
-            )
-        }
-        return result
+    suspend fun reconnectFromSavedUrl(): Boolean {
+        val creds = savedCredentials() ?: return false
+        return connect(creds) is XtreamAuthResult.Success
     }
 
-    suspend fun getSeriesEpisodes(creds: XtreamCredentials, seriesId: String): List<Episode> {
-        val json = httpClient.fetchJson("${creds.apiBaseUrl}&action=get_series_info&series_id=$seriesId")
-        val root = JSONObject(json)
-        val episodesBySeason = root.optJSONObject("episodes") ?: return emptyList()
-        val result = mutableListOf<Episode>()
-        val seasonKeys = episodesBySeason.keys()
-        while (seasonKeys.hasNext()) {
-            val seasonKey = seasonKeys.next()
-            val seasonArray = episodesBySeason.optJSONArray(seasonKey) ?: continue
-            for (i in 0 until seasonArray.length()) {
-                val ep = seasonArray.getJSONObject(i)
-                result += Episode(
-                    id = ep.optString("id"),
-                    title = ep.optString("title", "Épisode"),
-                    seasonNumber = seasonKey.toIntOrNull() ?: 0,
-                    episodeNumber = ep.optInt("episode_num", 0),
-                    containerExtension = ep.optString("container_extension", "mp4")
-                )
-            }
+    private fun savedCredentials(): XtreamCredentials? {
+        val server = securePrefs.xtreamServerUrl
+        val username = securePrefs.xtreamUsername
+        val password = securePrefs.xtreamPassword
+        if (!server.isNullOrBlank() && !username.isNullOrBlank() && !password.isNullOrBlank()) {
+            return XtreamCredentials(server, username, password)
         }
-        return result.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }))
+        // Compatibilité avec une session enregistrée avant la migration Xtream native
+        val legacyUrl = securePrefs.playlistUrl ?: return null
+        return XtreamCredentials.parse(legacyUrl)
     }
 
-    fun buildMovieStreamUrl(creds: XtreamCredentials, movie: Movie): String =
-        "${creds.baseUrl}/movie/${creds.username}/${creds.password}/${movie.id}.${movie.containerExtension}"
-
-    fun buildEpisodeStreamUrl(creds: XtreamCredentials, episode: Episode): String =
-        "${creds.baseUrl}/series/${creds.username}/${creds.password}/${episode.id}.${episode.containerExtension}"
-
-    private fun parseCategories(json: String): List<XtreamCategory> {
-        val array = JSONArray(json)
-        val result = mutableListOf<XtreamCategory>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            result += XtreamCategory(
-                id = obj.optString("category_id"),
-                name = obj.optString("category_name", "Sans nom")
-            )
-        }
-        return result
+    suspend fun loadVodCategoriesIfNeeded() {
+        if (_vodCategories.value.isNotEmpty()) return
+        val creds = credentials ?: return
+        _vodCategories.value = xtreamApi.getVodCategories(creds)
     }
+
+    suspend fun loadSeriesCategoriesIfNeeded() {
+        if (_seriesCategories.value.isNotEmpty()) return
+        val creds = credentials ?: return
+        _seriesCategories.value = xtreamApi.getSeriesCategories(creds)
+    }
+
+    suspend fun getLiveStreams(categoryId: String): List<Channel> {
+        liveStreamsCache[categoryId]?.let { return it }
+        val creds = credentials ?: return emptyList()
+        val streams = xtreamApi.getLiveStreams(creds, categoryId)
+        liveStreamsCache[categoryId] = streams
+        return streams
+    }
+
+    suspend fun getVodStreams(categoryId: String): List<Movie> {
+        vodStreamsCache[categoryId]?.let { return it }
+        val creds = credentials ?: return emptyList()
+        val streams = xtreamApi.getVodStreams(creds, categoryId)
+        vodStreamsCache[categoryId] = streams
+        return streams
+    }
+
+    suspend fun getSeries(categoryId: String): List<Series> {
+        seriesCache[categoryId]?.let { return it }
+        val creds = credentials ?: return emptyList()
+        val list = xtreamApi.getSeries(creds, categoryId)
+        seriesCache[categoryId] = list
+        return list
+    }
+
+    suspend fun getSeriesEpisodes(seriesId: String): List<Episode> {
+        val creds = credentials ?: return emptyList()
+        return xtreamApi.getSeriesEpisodes(creds, seriesId)
+    }
+
+    fun movieStreamUrl(movie: Movie): String? =
+        credentials?.let { xtreamApi.buildMovieStreamUrl(it, movie) }
+
+    fun episodeStreamUrl(episode: Episode): String? =
+        credentials?.let { xtreamApi.buildEpisodeStreamUrl(it, episode) }
 }
