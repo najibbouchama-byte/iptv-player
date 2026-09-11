@@ -9,11 +9,11 @@ private val DarkColors = darkColorScheme(
     background = BackgroundDark,
     surface = SurfaceDark,
     surfaceVariant = SurfaceVariantDark,
-    primary = AccentTeal,
-    secondary = AccentTealDark,
+    primary = AccentCrimson,
+    secondary = AccentCrimsonDark,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
-    onPrimary = BackgroundDark,
+    onPrimary = TextPrimary,
     error = ErrorRed
 )
 
@@ -22,7 +22,6 @@ fun IptvPlayerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // L'application est toujours en thème sombre, comme demandé ("interface moderne, sombre")
     MaterialTheme(
         colorScheme = DarkColors,
         typography = AppTypography,
