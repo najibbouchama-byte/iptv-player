@@ -53,7 +53,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             painter = painterResource(R.drawable.logo_infinity),
             contentDescription = "Infinity Player",
             modifier = Modifier
-                .size(180.dp)
+                .size(260.dp)
                 .scale(scale)
                 .alpha(alpha)
         )
