@@ -3,8 +3,7 @@ package com.iptvplayer.app.ui.livetv
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -19,11 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveTvScreen(
     viewModel: LiveTvViewModel = hiltViewModel(),
-    onChannelClick: (Channel) -> Unit
+    onChannelClick: (List<Channel>, Int) -> Unit
 ) {
     val categories by viewModel.categories.collectAsState()
     val favorites by viewModel.favorites.collectAsState(initial = emptyList())
@@ -67,8 +67,6 @@ fun LiveTvScreen(
             return@Column
         }
 
-        // Bouton "Catégorie" façon TiviMate : ouvre un panneau qui glisse
-        // depuis le bas avec la liste complète, plutôt qu'une rangée qui déborde.
         OutlinedButton(
             onClick = { showCategorySheet = true },
             modifier = Modifier.fillMaxWidth()
@@ -100,9 +98,8 @@ fun LiveTvScreen(
                 }
             }
             else -> {
-                val listState = rememberLazyListState()
-                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filteredChannels, key = { it.id }) { channel ->
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    itemsIndexed(filteredChannels, key = { _, ch -> ch.id }) { index, channel ->
                         ChannelRow(
                             channel = channel,
                             isFavorite = favoriteIds.contains(channel.id),
@@ -110,7 +107,7 @@ fun LiveTvScreen(
                                 ?.firstOrNull { it.isCurrent(System.currentTimeMillis()) },
                             onClick = {
                                 viewModel.recordWatched(channel)
-                                onChannelClick(channel)
+                                onChannelClick(filteredChannels, index)
                             },
                             onToggleFavorite = { viewModel.toggleFavorite(channel) },
                             showLogo = true
