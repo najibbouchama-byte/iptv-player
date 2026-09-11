@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -91,9 +92,9 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                         },
                         icon = {
                             Icon(
-                                tab.icon,
+                                imageVector = tab.icon,
                                 contentDescription = null,
-                                modifier = Modifier.size(22.dp.let { it })
+                                modifier = Modifier.size(22.dp)
                             )
                         },
                         label = {
