@@ -34,6 +34,7 @@ class VlcPlayerViewModel @Inject constructor(
         )
     )
     val mediaPlayer = MediaPlayer(libVLC)
+    private var currentMedia: Media? = null
 
     private val _currentChannel = MutableStateFlow<Channel?>(null)
     val currentChannel: StateFlow<Channel?> = _currentChannel
@@ -100,7 +101,12 @@ class VlcPlayerViewModel @Inject constructor(
                 }
                 MediaPlayer.Event.TimeChanged -> {
                     _currentPosition.value = event.timeChanged
-                    _duration.value = mediaPlayer.length
+                    // On ne fait confiance à la durée fournie ici que si elle est valide ;
+                    // sinon on garde celle éventuellement déjà trouvée via parseAsync().
+                    val playerLength = mediaPlayer.length
+                    if (playerLength > 0) {
+                        _duration.value = playerLength
+                    }
                     progressSaveCounter++
                     if (progressSaveCounter % 5 == 0) {
                         saveProgress()
@@ -157,7 +163,7 @@ class VlcPlayerViewModel @Inject constructor(
     }
 
     fun seekRelative(deltaMs: Long) {
-        val length = mediaPlayer.length
+        val length = mediaPlayer.length.takeIf { it > 0 } ?: _duration.value
         if (length <= 0) return
         val newPosition = (mediaPlayer.time + deltaMs).coerceIn(0, length)
         mediaPlayer.time = newPosition
@@ -177,15 +183,34 @@ class VlcPlayerViewModel @Inject constructor(
     fun play(channel: Channel) {
         _errorMessage.value = null
         _isBuffering.value = true
+        _duration.value = 0L
         _currentChannel.value = channel
         progressSaveCounter = 0
         viewModelScope.launch {
             pendingResumePositionMs = watchProgressRepository.getSavedPosition(channel.id)
         }
+
+        // On libère l'ancien média seulement maintenant (pas juste après l'avoir
+        // assigné) pour laisser le temps à l'analyse réseau ci-dessous de se terminer.
+        currentMedia?.release()
+
         val media = Media(libVLC, Uri.parse(channel.streamUrl))
         media.setHWDecoderEnabled(false, false)
+
+        // Tentative de récupération de la durée par analyse directe du flux :
+        // ça fonctionne pour certains fichiers que la lecture seule ne révèle pas.
+        media.setEventListener { event ->
+            if (event.type == Media.Event.ParsedChanged) {
+                val parsedDuration = media.duration
+                if (parsedDuration > 0 && _duration.value <= 0) {
+                    _duration.value = parsedDuration
+                }
+            }
+        }
+        media.parseAsync(Media.Parse.ParseNetwork)
+
+        currentMedia = media
         mediaPlayer.media = media
-        media.release()
         mediaPlayer.play()
     }
 
@@ -196,7 +221,7 @@ class VlcPlayerViewModel @Inject constructor(
     private fun saveProgress() {
         val channel = _currentChannel.value ?: return
         val position = mediaPlayer.time
-        val length = mediaPlayer.length
+        val length = mediaPlayer.length.takeIf { it > 0 } ?: _duration.value
         if (length <= 0) return
         viewModelScope.launch {
             watchProgressRepository.saveProgress(channel, position, length)
@@ -208,6 +233,7 @@ class VlcPlayerViewModel @Inject constructor(
         mediaPlayer.stop()
         mediaPlayer.detachViews()
         mediaPlayer.release()
+        currentMedia?.release()
         libVLC.release()
         super.onCleared()
     }
