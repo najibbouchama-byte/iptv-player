@@ -168,6 +168,7 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                         playerQueue = channels
                         playerIndex = index
                     },
+                    onSeriesClick = { selectedSeriesForDetail = it },
                     onBrowseLiveTv = { goToTab("live_tv") }
                 )
             }
