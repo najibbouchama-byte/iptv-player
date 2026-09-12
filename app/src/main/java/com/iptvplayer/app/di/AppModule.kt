@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.iptvplayer.app.data.local.AppDatabase
 import com.iptvplayer.app.data.local.dao.FavoriteDao
 import com.iptvplayer.app.data.local.dao.HistoryDao
+import com.iptvplayer.app.data.local.dao.MyListDao
 import com.iptvplayer.app.data.local.dao.WatchProgressDao
 import dagger.Module
 import dagger.Provides
@@ -32,4 +33,7 @@ object AppModule {
 
     @Provides
     fun provideWatchProgressDao(db: AppDatabase): WatchProgressDao = db.watchProgressDao()
+
+    @Provides
+    fun provideMyListDao(db: AppDatabase): MyListDao = db.myListDao()
 }
