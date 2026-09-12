@@ -10,14 +10,28 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -27,11 +41,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.iptvplayer.app.R
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
@@ -39,17 +58,26 @@ import com.iptvplayer.app.data.model.Series
 import com.iptvplayer.app.ui.common.PosterCard
 import com.iptvplayer.app.ui.common.rowFocusScale
 
+private val BrandTeal = Color(0xFF22D3EE)
+private val BrandViolet = Color(0xFF8B5CF6)
+private val BrandPink = Color(0xFFEC4899)
+
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onChannelClick: (Channel) -> Unit,
-    onSeriesClick: (Series) -> Unit = {}
+    onSeriesClick: (Series) -> Unit = {},
+    onNavigateLiveTv: () -> Unit = {},
+    onNavigateMovies: () -> Unit = {},
+    onNavigateSeries: () -> Unit = {}
 ) {
     val continueWatching by viewModel.continueWatching.collectAsState()
+    val heroMovies by viewModel.heroMovies.collectAsState()
     val topTen by viewModel.topTen.collectAsState()
     val newReleases by viewModel.newReleases.collectAsState()
     val categoryRows by viewModel.categoryRows.collectAsState()
     val isLoading by viewModel.isLoadingDiscovery.collectAsState()
+    val myListIds by viewModel.myListIds.collectAsState()
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isIndexing by viewModel.isIndexing.collectAsState()
@@ -71,31 +99,32 @@ fun HomeScreen(
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Accueil",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Image(
-                    painter = painterResource(R.drawable.logo_infinity),
-                    contentDescription = "Infinity Player",
-                    modifier = Modifier.size(100.dp)
-                )
-            }
             Spacer(modifier = Modifier.height(16.dp))
+            TopBrandBar(profileName = viewModel.profileName)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
+        if (!isSearching) {
+            if (heroMovies.isNotEmpty()) {
+                item {
+                    HeroCarousel(
+                        movies = heroMovies,
+                        myListIds = myListIds,
+                        onWatch = { movie -> channelForMovie(movie)?.let(onChannelClick) },
+                        onToggleMyList = { viewModel.toggleMyList(it) }
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+            }
+        }
+
+        item {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.updateSearchQuery(it) },
                 placeholder = {
                     Text(
-                        "Rechercher un titre…",
+                        "Rechercher un film ou une série…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     )
@@ -184,6 +213,15 @@ fun HomeScreen(
             return@LazyColumn
         }
 
+        item {
+            QuickAccessRow(
+                onLiveTv = onNavigateLiveTv,
+                onMovies = onNavigateMovies,
+                onSeries = onNavigateSeries
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
         if (continueWatching.isNotEmpty()) {
             item { SectionHeader("Reprendre la lecture") }
             item {
@@ -194,157 +232,11 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     itemsIndexed(continueWatching, key = { _, item -> item.channel.id }) { index, item ->
-                        PosterCard(
-                            title = item.channel.name,
-                            posterUrl = item.channel.logoUrl,
-                            showPoster = true,
-                            progressFraction = item.progress,
-                            onClick = { onChannelClick(item.channel) },
-                            modifier = Modifier.width(120.dp).rowFocusScale(index, rowState)
-                        )
-                    }
-                }
-            }
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-        }
-
-        if (isLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-        } else {
-            if (topTen.isNotEmpty()) {
-                item { SectionHeader("Top 10 des films") }
-                item {
-                    val rowState = rememberLazyListState()
-                    LazyRow(
-                        state = rowState,
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        itemsIndexed(topTen, key = { _, movie -> movie.id }) { index, movie ->
-                            TopTenCard(
-                                rank = index + 1,
-                                movie = movie,
-                                onClick = { channelForMovie(movie)?.let(onChannelClick) },
-                                modifier = Modifier.rowFocusScale(index, rowState)
+                        Column(modifier = Modifier.width(120.dp).rowFocusScale(index, rowState)) {
+                            PosterCard(
+                                title = item.channel.name,
+                                posterUrl = item.channel.logoUrl,
+                                showPoster = true,
+                                progressFraction = item.progress,
+                                onClick = { onChannelClick(item.channel) }
                             )
-                        }
-                    }
-                }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-            }
-
-            if (newReleases.isNotEmpty()) {
-                item { SectionHeader("Nouveautés") }
-                item {
-                    MovieRowContent(movies = newReleases, onChannelClick = { channelForMovie(it)?.let(onChannelClick) })
-                }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-            }
-
-            categoryRows.forEach { row ->
-                item { SectionHeader(row.title) }
-                item {
-                    MovieRowContent(movies = row.movies, onChannelClick = { channelForMovie(it)?.let(onChannelClick) })
-                }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-            }
-        }
-
-        item { Spacer(modifier = Modifier.height(24.dp)) }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
-    Spacer(modifier = Modifier.height(10.dp))
-}
-
-@Composable
-private fun TopTenCard(
-    rank: Int,
-    movie: Movie,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier.width(120.dp)) {
-        PosterCard(
-            title = movie.name,
-            posterUrl = movie.posterUrl,
-            showPoster = true,
-            onClick = onClick
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(6.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black.copy(alpha = 0.65f))
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-        ) {
-            Text(
-                text = "$rank",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-    }
-}
-
-@Composable
-private fun <T> SearchResultsGrid(
-    items: List<T>,
-    posterUrlOf: (T) -> String?,
-    titleOf: (T) -> String,
-    onClick: (T) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = modifier.height(((items.size / 3 + 1) * 200).dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        items(items) { item ->
-            PosterCard(
-                title = titleOf(item),
-                posterUrl = posterUrlOf(item),
-                showPoster = true,
-                onClick = { onClick(item) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun MovieRowContent(
-    movies: List<Movie>,
-    onChannelClick: (Movie) -> Unit
-) {
-    val rowState = rememberLazyListState()
-    LazyRow(
-        state = rowState,
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        itemsIndexed(movies, key = { _, movie -> movie.id }) { index, movie ->
-            PosterCard(
-                title = movie.name,
-                posterUrl = movie.posterUrl,
-                showPoster = true,
-                onClick = { onChannelClick(movie) },
-                modifier = Modifier.width(120.dp).rowFocusScale(index, rowState)
-            )
-        }
-    }
-}
