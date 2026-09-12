@@ -2,9 +2,11 @@ package com.iptvplayer.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iptvplayer.app.data.local.SecurePrefs
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.model.Movie
 import com.iptvplayer.app.data.model.Series
+import com.iptvplayer.app.data.repository.MyListRepository
 import com.iptvplayer.app.data.repository.WatchProgressRepository
 import com.iptvplayer.app.data.repository.XtreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +29,11 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlin.random.Random
 
-data class ContinueWatchingItem(val channel: Channel, val progress: Float)
+data class ContinueWatchingItem(
+    val channel: Channel,
+    val progress: Float,
+    val remainingMinutes: Int
+)
 data class MovieRow(val title: String, val movies: List<Movie>)
 
 private data class GenreDefinition(val label: String, val keywords: List<String>)
@@ -51,18 +57,35 @@ private val GENRES = listOf(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val xtreamRepository: XtreamRepository,
-    private val watchProgressRepository: WatchProgressRepository
+    private val watchProgressRepository: WatchProgressRepository,
+    private val myListRepository: MyListRepository,
+    private val securePrefs: SecurePrefs
 ) : ViewModel() {
+
+    val profileName: String
+        get() = securePrefs.profileName?.takeIf { it.isNotBlank() } ?: "vous"
 
     val continueWatching: StateFlow<List<ContinueWatchingItem>> =
         watchProgressRepository.observeContinueWatching()
             .map { list ->
                 list.map { entity ->
                     val fraction = if (entity.durationMs > 0) entity.positionMs.toFloat() / entity.durationMs else 0f
-                    ContinueWatchingItem(watchProgressRepository.toChannel(entity), fraction)
+                    val remainingMs = (entity.durationMs - entity.positionMs).coerceAtLeast(0)
+                    ContinueWatchingItem(
+                        channel = watchProgressRepository.toChannel(entity),
+                        progress = fraction,
+                        remainingMinutes = (remainingMs / 60000L).toInt()
+                    )
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val myListIds: StateFlow<Set<String>> = myListRepository.observeAll()
+        .map { list -> list.map { it.itemId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    private val _heroMovies = MutableStateFlow<List<Movie>>(emptyList())
+    val heroMovies: StateFlow<List<Movie>> = _heroMovies
 
     private val _topTen = MutableStateFlow<List<Movie>>(emptyList())
     val topTen: StateFlow<List<Movie>> = _topTen
@@ -75,8 +98,6 @@ class HomeViewModel @Inject constructor(
 
     private val _isLoadingDiscovery = MutableStateFlow(true)
     val isLoadingDiscovery: StateFlow<Boolean> = _isLoadingDiscovery
-
-    // --- Recherche ---
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -107,15 +128,14 @@ class HomeViewModel @Inject constructor(
             val recentOnes = allMovies.filter { it.name.contains(currentYear) }
             _newReleases.value = (recentOnes.ifEmpty { allMovies }).take(12)
 
-            // Top 10 façon Netflix : sélection qui change tous les 2 jours,
-            // calculée à partir de la date du jour, sans avoir besoin d'un serveur.
             if (allMovies.isNotEmpty()) {
                 val epochDay = System.currentTimeMillis() / (1000L * 60 * 60 * 24)
                 val seed = epochDay / 2
-                _topTen.value = allMovies.shuffled(Random(seed)).take(10)
+                val shuffled = allMovies.shuffled(Random(seed))
+                _topTen.value = shuffled.take(10)
+                _heroMovies.value = shuffled.take(5)
             }
 
-            // Sections par genre, déduites du nom des catégories du panel
             val rows = mutableListOf<MovieRow>()
             val vodCategories = xtreamRepository.vodCategories.value
             for (genre in GENRES) {
@@ -124,9 +144,7 @@ class HomeViewModel @Inject constructor(
                     .map { it.id }
                     .toSet()
                 if (matchingCategoryIds.isEmpty()) continue
-
-                val genreMovies = allMovies.filter { it.categoryId in matchingCategoryIds }
-                    .distinctBy { it.id }
+                val genreMovies = allMovies.filter { it.categoryId in matchingCategoryIds }.distinctBy { it.id }
                 if (genreMovies.isNotEmpty()) {
                     rows += MovieRow(genre.label, genreMovies.take(15))
                 }
@@ -137,11 +155,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Charge TOUS les films de TOUTES les catégories, en parallèle (par lots
-     * de 6 requêtes), une seule fois. Sert à la fois aux sections par genre,
-     * au Top 10, et à la recherche (qui devient alors quasi instantanée).
-     */
     private suspend fun loadAllMoviesIndexed(): List<Movie> {
         allMoviesIndex?.let { return it }
         xtreamRepository.loadVodCategoriesIfNeeded()
@@ -189,6 +202,18 @@ class HomeViewModel @Inject constructor(
             } finally {
                 _isIndexing.value = false
             }
+        }
+    }
+
+    fun toggleMyList(movie: Movie) {
+        viewModelScope.launch {
+            myListRepository.toggle(
+                itemId = movie.id,
+                type = "movie",
+                name = movie.name,
+                posterUrl = movie.posterUrl,
+                streamUrl = streamUrlFor(movie)
+            )
         }
     }
 
