@@ -73,6 +73,11 @@ class SecurePrefs @Inject constructor(
         get() = prefs.getInt(KEY_MAX_BUFFER, 50)
         set(value) = prefs.edit().putInt(KEY_MAX_BUFFER, value).apply()
 
+    /** Taille des sous-titres du lecteur VLC (Films/Séries), en pourcentage. 100 = taille normale */
+    var subtitleScalePercent: Int
+        get() = prefs.getInt(KEY_SUBTITLE_SCALE, 100)
+        set(value) = prefs.edit().putInt(KEY_SUBTITLE_SCALE, value).apply()
+
     fun isLoggedIn(): Boolean {
         if (!rememberMe) return false
         val hasXtreamCredentials =
@@ -96,6 +101,7 @@ class SecurePrefs @Inject constructor(
         private const val KEY_CONNECTION_MODE = "connection_mode"
         private const val KEY_MIN_BUFFER = "min_buffer_seconds"
         private const val KEY_MAX_BUFFER = "max_buffer_seconds"
+        private const val KEY_SUBTITLE_SCALE = "subtitle_scale_percent"
 
         const val MODE_XTREAM = "XTREAM"
         const val MODE_M3U = "M3U"
