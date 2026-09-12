@@ -12,12 +12,19 @@ class MyListRepository @Inject constructor(
 ) {
     fun observeAll(): Flow<List<MyListEntity>> = dao.observeAll()
 
+    fun observeByType(type: String): Flow<List<MyListEntity>> = dao.observeByType(type)
+
+    suspend fun remove(itemId: String) {
+        dao.deleteById(itemId)
+    }
+
     suspend fun toggle(
         itemId: String,
         type: String,
         name: String,
         posterUrl: String?,
-        streamUrl: String?
+        streamUrl: String?,
+        categoryId: String? = null
     ) {
         if (dao.isInList(itemId)) {
             dao.deleteById(itemId)
@@ -29,6 +36,7 @@ class MyListRepository @Inject constructor(
                     name = name,
                     posterUrl = posterUrl,
                     streamUrl = streamUrl,
+                    categoryId = categoryId,
                     addedAtMillis = System.currentTimeMillis()
                 )
             )
