@@ -2,12 +2,11 @@ package com.iptvplayer.app.ui.movies
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyRowItems
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +17,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.ui.common.CategorySelectorButton
 import com.iptvplayer.app.ui.common.PosterCard
-import com.iptvplayer.app.ui.common.gridFocusScale
 
 @Composable
 fun MoviesScreen(
