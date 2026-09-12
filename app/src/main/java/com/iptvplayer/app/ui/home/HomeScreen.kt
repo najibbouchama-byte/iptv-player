@@ -16,8 +16,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
@@ -31,7 +29,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -78,7 +75,6 @@ fun HomeScreen(
     val newReleases by viewModel.newReleases.collectAsState()
     val categoryRows by viewModel.categoryRows.collectAsState()
     val isLoading by viewModel.isLoadingDiscovery.collectAsState()
-    val myListIds by viewModel.myListIds.collectAsState()
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isIndexing by viewModel.isIndexing.collectAsState()
@@ -110,9 +106,7 @@ fun HomeScreen(
                 item {
                     HeroCarousel(
                         movies = heroMovies,
-                        myListIds = myListIds,
-                        onWatch = { movie -> channelForMovie(movie)?.let(onChannelClick) },
-                        onToggleMyList = { viewModel.toggleMyList(it) }
+                        onWatch = { movie -> channelForMovie(movie)?.let(onChannelClick) }
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                 }
@@ -359,9 +353,7 @@ private fun TopBrandBar(profileName: String) {
 @Composable
 private fun HeroCarousel(
     movies: List<Movie>,
-    myListIds: Set<String>,
-    onWatch: (Movie) -> Unit,
-    onToggleMyList: (Movie) -> Unit
+    onWatch: (Movie) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { movies.size })
 
@@ -372,7 +364,6 @@ private fun HeroCarousel(
             pageSpacing = 12.dp
         ) { page ->
             val movie = movies[page]
-            val inMyList = myListIds.contains(movie.id)
             val year = Regex("\\((\\d{4})\\)").find(movie.name)?.groupValues?.get(1)
 
             Box(
@@ -427,30 +418,14 @@ private fun HeroCarousel(
                         Text(year, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodyMedium)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row {
-                        Button(
-                            onClick = { onWatch(movie) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                            shape = RoundedCornerShape(24.dp)
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Regarder", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        OutlinedButton(
-                            onClick = { onToggleMyList(movie) },
-                            shape = RoundedCornerShape(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (inMyList) Icons.Filled.Check else Icons.Filled.Add,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (inMyList) "Dans ma liste" else "Ma liste", color = Color.White)
-                        }
+                    Button(
+                        onClick = { onWatch(movie) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Regarder", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
