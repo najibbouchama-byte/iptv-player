@@ -4,7 +4,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Un film ou une série ajouté par l'utilisateur à "Ma liste" depuis l'Accueil.
+ * Un film ou une série ajouté par l'utilisateur à "Ma liste" (appui long
+ * sur une affiche dans Films/Séries/Accueil).
  */
 @Entity(tableName = "my_list")
 data class MyListEntity(
@@ -12,6 +13,7 @@ data class MyListEntity(
     val type: String, // "movie" ou "series"
     val name: String,
     val posterUrl: String?,
-    val streamUrl: String?,
+    val streamUrl: String?, // uniquement pour les films
+    val categoryId: String?,
     val addedAtMillis: Long
 )
