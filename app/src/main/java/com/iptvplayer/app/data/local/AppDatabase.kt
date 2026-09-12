@@ -13,7 +13,7 @@ import com.iptvplayer.app.data.local.entity.WatchProgressEntity
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class, WatchProgressEntity::class, MyListEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
