@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 import javax.inject.Inject
 
 data class TrackOption(val id: Int, val name: String)
@@ -101,8 +102,6 @@ class VlcPlayerViewModel @Inject constructor(
                 }
                 MediaPlayer.Event.TimeChanged -> {
                     _currentPosition.value = event.timeChanged
-                    // On ne fait confiance à la durée fournie ici que si elle est valide ;
-                    // sinon on garde celle éventuellement déjà trouvée via parseAsync().
                     val playerLength = mediaPlayer.length
                     if (playerLength > 0) {
                         _duration.value = playerLength
@@ -190,24 +189,20 @@ class VlcPlayerViewModel @Inject constructor(
             pendingResumePositionMs = watchProgressRepository.getSavedPosition(channel.id)
         }
 
-        // On libère l'ancien média seulement maintenant (pas juste après l'avoir
-        // assigné) pour laisser le temps à l'analyse réseau ci-dessous de se terminer.
         currentMedia?.release()
 
         val media = Media(libVLC, Uri.parse(channel.streamUrl))
         media.setHWDecoderEnabled(false, false)
 
-        // Tentative de récupération de la durée par analyse directe du flux :
-        // ça fonctionne pour certains fichiers que la lecture seule ne révèle pas.
         media.setEventListener { event ->
-            if (event.type == Media.Event.ParsedChanged) {
+            if (event.type == IMedia.Event.ParsedChanged) {
                 val parsedDuration = media.duration
                 if (parsedDuration > 0 && _duration.value <= 0) {
                     _duration.value = parsedDuration
                 }
             }
         }
-        media.parseAsync(Media.Parse.ParseNetwork)
+        media.parseAsync(IMedia.Parse.ParseNetwork)
 
         currentMedia = media
         mediaPlayer.media = media
