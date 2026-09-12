@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.iptvplayer.app.data.local.SecurePrefs
 import com.iptvplayer.app.data.model.Channel
 import com.iptvplayer.app.data.repository.WatchProgressRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,13 +16,23 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import javax.inject.Inject
 
+data class TrackOption(val id: Int, val name: String)
+
 @HiltViewModel
 class VlcPlayerViewModel @Inject constructor(
     application: Application,
-    private val watchProgressRepository: WatchProgressRepository
+    private val watchProgressRepository: WatchProgressRepository,
+    private val securePrefs: SecurePrefs
 ) : AndroidViewModel(application) {
 
-    private val libVLC = LibVLC(application, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
+    private val libVLC = LibVLC(
+        application,
+        arrayListOf(
+            "--no-drop-late-frames",
+            "--no-skip-frames",
+            "--sub-text-scale=${securePrefs.subtitleScalePercent}"
+        )
+    )
     val mediaPlayer = MediaPlayer(libVLC)
 
     private val _currentChannel = MutableStateFlow<Channel?>(null)
@@ -47,10 +58,30 @@ class VlcPlayerViewModel @Inject constructor(
     private val _aspectLabel = MutableStateFlow("Ajusté")
     val aspectLabel: StateFlow<String> = _aspectLabel
 
+    private val _volumePercent = MutableStateFlow(100)
+    val volumePercent: StateFlow<Int> = _volumePercent
+
+    private val _audioTracks = MutableStateFlow<List<TrackOption>>(emptyList())
+    val audioTracks: StateFlow<List<TrackOption>> = _audioTracks
+
+    private val _currentAudioTrackId = MutableStateFlow(-1)
+    val currentAudioTrackId: StateFlow<Int> = _currentAudioTrackId
+
+    private val _subtitleTracks = MutableStateFlow<List<TrackOption>>(emptyList())
+    val subtitleTracks: StateFlow<List<TrackOption>> = _subtitleTracks
+
+    private val _currentSubtitleTrackId = MutableStateFlow(-1)
+    val currentSubtitleTrackId: StateFlow<Int> = _currentSubtitleTrackId
+
+    private val _subtitleScalePercent = MutableStateFlow(securePrefs.subtitleScalePercent)
+    val subtitleScalePercent: StateFlow<Int> = _subtitleScalePercent
+
     private var pendingResumePositionMs: Long? = null
     private var progressSaveCounter = 0
 
     init {
+        mediaPlayer.volume = _volumePercent.value
+
         mediaPlayer.setEventListener { event ->
             when (event.type) {
                 MediaPlayer.Event.Playing -> {
@@ -61,6 +92,7 @@ class VlcPlayerViewModel @Inject constructor(
                         mediaPlayer.time = resumePos
                         pendingResumePositionMs = null
                     }
+                    refreshTracks()
                 }
                 MediaPlayer.Event.Paused -> _isPlaying.value = false
                 MediaPlayer.Event.Buffering -> {
@@ -84,6 +116,44 @@ class VlcPlayerViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun refreshTracks() {
+        _audioTracks.value = mediaPlayer.audioTracks
+            ?.map { TrackOption(it.id, it.name) }
+            ?: emptyList()
+        _currentAudioTrackId.value = mediaPlayer.audioTrack
+
+        _subtitleTracks.value = mediaPlayer.spuTracks
+            ?.map { TrackOption(it.id, it.name) }
+            ?: emptyList()
+        _currentSubtitleTrackId.value = mediaPlayer.spuTrack
+    }
+
+    fun selectAudioTrack(id: Int) {
+        mediaPlayer.setAudioTrack(id)
+        _currentAudioTrackId.value = id
+    }
+
+    fun selectSubtitleTrack(id: Int) {
+        mediaPlayer.setSpuTrack(id)
+        _currentSubtitleTrackId.value = id
+    }
+
+    fun setVolume(percent: Int) {
+        val safe = percent.coerceIn(0, 150)
+        mediaPlayer.volume = safe
+        _volumePercent.value = safe
+    }
+
+    /**
+     * S'applique à la prochaine lecture (libVLC ne permet pas de changer la
+     * taille des sous-titres en direct sur une vidéo déjà en cours).
+     */
+    fun updateSubtitleScaleForNextPlayback(percent: Int) {
+        val safe = percent.coerceIn(50, 200)
+        _subtitleScalePercent.value = safe
+        securePrefs.subtitleScalePercent = safe
     }
 
     fun seekRelative(deltaMs: Long) {
