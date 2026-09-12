@@ -5,17 +5,25 @@ import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,10 +34,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -61,8 +71,15 @@ fun VlcPlayerScreen(
     val currentPosition by viewModel.currentPosition.collectAsState()
     val duration by viewModel.duration.collectAsState()
     val aspectLabel by viewModel.aspectLabel.collectAsState()
+    val volumePercent by viewModel.volumePercent.collectAsState()
+    val audioTracks by viewModel.audioTracks.collectAsState()
+    val currentAudioTrackId by viewModel.currentAudioTrackId.collectAsState()
+    val subtitleTracks by viewModel.subtitleTracks.collectAsState()
+    val currentSubtitleTrackId by viewModel.currentSubtitleTrackId.collectAsState()
+    val subtitleScalePercent by viewModel.subtitleScalePercent.collectAsState()
 
     var draggingPosition by remember { mutableStateOf<Float?>(null) }
+    var showTracksPanel by remember { mutableStateOf(false) }
 
     var controlsVisible by remember { mutableStateOf(true) }
     var interactionTick by remember { mutableStateOf(0) }
@@ -114,7 +131,9 @@ fun VlcPlayerScreen(
             .background(Color.Black)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
-                    if (controlsVisible) {
+                    if (showTracksPanel) {
+                        showTracksPanel = false
+                    } else if (controlsVisible) {
                         controlsVisible = false
                     } else {
                         keepControlsVisible()
@@ -176,9 +195,32 @@ fun VlcPlayerScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = { showTracksPanel = true; keepControlsVisible() }) {
+                    Icon(Icons.Filled.ClosedCaption, contentDescription = "Audio et sous-titres", tint = Color.White)
+                }
                 IconButton(onClick = { viewModel.cycleAspectRatio(); keepControlsVisible() }) {
                     Icon(Icons.Filled.AspectRatio, contentDescription = "Ajuster l'image ($aspectLabel)", tint = Color.White)
                 }
+            }
+
+            // Volume vertical sur le bord droit
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+                    .height(220.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Icon(Icons.Filled.VolumeUp, contentDescription = null, tint = Color.White)
+                VerticalVolumeBar(
+                    volumePercent = volumePercent,
+                    onVolumeChange = {
+                        viewModel.setVolume(it)
+                        keepControlsVisible()
+                    },
+                    modifier = Modifier.weight(1f).padding(vertical = 12.dp)
+                )
             }
 
             Column(
@@ -263,6 +305,171 @@ fun VlcPlayerScreen(
                             contentDescription = "Épisode suivant",
                             tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f),
                             modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showTracksPanel) {
+            TracksPanel(
+                audioTracks = audioTracks,
+                currentAudioTrackId = currentAudioTrackId,
+                subtitleTracks = subtitleTracks,
+                currentSubtitleTrackId = currentSubtitleTrackId,
+                subtitleScalePercent = subtitleScalePercent,
+                onSelectAudio = { viewModel.selectAudioTrack(it); keepControlsVisible() },
+                onSelectSubtitle = { viewModel.selectSubtitleTrack(it); keepControlsVisible() },
+                onSubtitleScaleChange = { viewModel.updateSubtitleScaleForNextPlayback(it) },
+                onDismiss = { showTracksPanel = false },
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+}
+
+@Composable
+private fun VerticalVolumeBar(
+    volumePercent: Int,
+    onVolumeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val maxVolume = 150f
+    Box(
+        modifier = modifier
+            .width(6.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(Color.White.copy(alpha = 0.25f))
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { change, _ ->
+                    val heightPx = size.height.toFloat().coerceAtLeast(1f)
+                    val relative = 1f - (change.position.y / heightPx).coerceIn(0f, 1f)
+                    onVolumeChange((relative * maxVolume).toInt())
+                }
+            }
+    ) {
+        val fraction = (volumePercent / maxVolume).coerceIn(0f, 1f)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(fraction)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+    }
+}
+
+@Composable
+private fun TracksPanel(
+    audioTracks: List<TrackOption>,
+    currentAudioTrackId: Int,
+    subtitleTracks: List<TrackOption>,
+    currentSubtitleTrackId: Int,
+    subtitleScalePercent: Int,
+    onSelectAudio: (Int) -> Unit,
+    onSelectSubtitle: (Int) -> Unit,
+    onSubtitleScaleChange: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(24.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF11142A))
+            .padding(16.dp)
+            .pointerInput(Unit) { detectTapGestures { } } // absorbe les taps pour ne pas fermer le panneau
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            TrackColumn(
+                title = "Audio (${audioTracks.size} piste${if (audioTracks.size > 1) "s" else ""})",
+                tracks = audioTracks,
+                currentId = currentAudioTrackId,
+                onSelect = onSelectAudio,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            TrackColumn(
+                title = "Sous-titres (${subtitleTracks.size} piste${if (subtitleTracks.size > 1) "s" else ""})",
+                tracks = subtitleTracks,
+                currentId = currentSubtitleTrackId,
+                onSelect = onSelectSubtitle,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            "Taille des sous-titres",
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "S'applique à la prochaine lecture",
+            color = Color.White.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.labelSmall
+        )
+        Slider(
+            value = subtitleScalePercent.toFloat(),
+            onValueChange = { onSubtitleScaleChange(it.toInt()) },
+            valueRange = 50f..200f,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+            )
+        )
+    }
+}
+
+@Composable
+private fun TrackColumn(
+    title: String,
+    tracks: List<TrackOption>,
+    currentId: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = title,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        if (tracks.isEmpty()) {
+            Text(
+                "Aucune",
+                color = Color.White.copy(alpha = 0.4f),
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            LazyColumn(modifier = Modifier.heightIn(max = 180.dp)) {
+                items(tracks) { track ->
+                    val isSelected = track.id == currentId
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelect(track.id) }
+                            .padding(vertical = 8.dp, horizontal = 6.dp)
+                    ) {
+                        Text(
+                            text = track.name,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
