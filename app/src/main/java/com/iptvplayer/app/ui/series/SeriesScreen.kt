@@ -1,6 +1,8 @@
 package com.iptvplayer.app.ui.series
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -9,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.iptvplayer.app.data.model.Channel
@@ -20,12 +23,14 @@ fun SeriesScreen(
     viewModel: SeriesViewModel = hiltViewModel(),
     onPlayEpisodes: (List<Channel>, Int) -> Unit
 ) {
+    val context = LocalContext.current
     var selectedSeriesId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val seriesList by viewModel.series.collectAsState()
+    val myListIds by viewModel.myListIds.collectAsState()
 
     val selectedSeries = seriesList.find { it.id == selectedSeriesId }
 
@@ -80,11 +85,17 @@ fun SeriesScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 items(seriesList, key = { it.id }) { series ->
+                    val inMyList = myListIds.contains(series.id)
                     PosterCard(
                         title = series.name,
                         posterUrl = series.posterUrl,
                         showPoster = true,
-                        onClick = { selectedSeriesId = series.id }
+                        onClick = { selectedSeriesId = series.id },
+                        onLongClick = {
+                            viewModel.toggleMyList(series)
+                            val message = if (inMyList) "Retiré de ma liste" else "Ajouté à ma liste"
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
