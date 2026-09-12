@@ -62,6 +62,7 @@ private val BrandTeal = Color(0xFF22D3EE)
 private val BrandViolet = Color(0xFF8B5CF6)
 private val BrandPink = Color(0xFFEC4899)
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
@@ -354,6 +355,7 @@ private fun TopBrandBar(profileName: String) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun HeroCarousel(
     movies: List<Movie>,
