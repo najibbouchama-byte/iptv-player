@@ -12,6 +12,9 @@ interface MyListDao {
     @Query("SELECT * FROM my_list ORDER BY addedAtMillis DESC")
     fun observeAll(): Flow<List<MyListEntity>>
 
+    @Query("SELECT * FROM my_list WHERE type = :type ORDER BY addedAtMillis DESC")
+    fun observeByType(type: String): Flow<List<MyListEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: MyListEntity)
 
