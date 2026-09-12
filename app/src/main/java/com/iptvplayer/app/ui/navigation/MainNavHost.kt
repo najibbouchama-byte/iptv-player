@@ -53,6 +53,16 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
 
     val navController = rememberNavController()
 
+    fun goToTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     val currentSeries = selectedSeriesForDetail
     if (currentSeries != null && playerQueue.isEmpty()) {
         SeriesDetailScreen(
@@ -100,15 +110,7 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                     val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { goToTab(tab.route) },
                         icon = {
                             Icon(
                                 imageVector = tab.icon,
@@ -139,7 +141,10 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
             composable("home") {
                 HomeScreen(
                     onChannelClick = { playerQueue = listOf(it); playerIndex = 0 },
-                    onSeriesClick = { selectedSeriesForDetail = it }
+                    onSeriesClick = { selectedSeriesForDetail = it },
+                    onNavigateLiveTv = { goToTab("live_tv") },
+                    onNavigateMovies = { goToTab("movies") },
+                    onNavigateSeries = { goToTab("series") }
                 )
             }
             composable("live_tv") {
@@ -163,15 +168,7 @@ fun MainNavHost(onLoggedOut: () -> Unit) {
                         playerQueue = channels
                         playerIndex = index
                     },
-                    onBrowseLiveTv = {
-                        navController.navigate("live_tv") {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
+                    onBrowseLiveTv = { goToTab("live_tv") }
                 )
             }
             composable("settings") {
